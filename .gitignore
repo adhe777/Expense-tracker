@@ -1,0 +1,19 @@
+# Backend
+backend/node_modules/
+backend/.env
+backend/dist/
+backend/build/
+
+# Frontend
+frontend/node_modules/
+frontend/.env
+frontend/dist/
+frontend/build/
+frontend/.next/
+
+# IDE and System
+.vscode/
+.idea/
+.DS_Store
+*.log
+node_modules/
