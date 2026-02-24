@@ -4,11 +4,8 @@ const User = require('../models/userModel');
 const registerUser = async (req, res) => {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-        return res.status(400).json({ message: 'Please add all fields' });
-    }
-
     const userExists = await User.findOne({ email });
+
     if (userExists) {
         return res.status(400).json({ message: 'User already exists' });
     }
@@ -20,7 +17,6 @@ const registerUser = async (req, res) => {
             _id: user.id,
             name: user.name,
             email: user.email,
-            isAdmin: user.isAdmin,
             token: generateToken(user._id)
         });
     } else {
@@ -38,7 +34,6 @@ const loginUser = async (req, res) => {
             _id: user.id,
             name: user.name,
             email: user.email,
-            isAdmin: user.isAdmin,
             token: generateToken(user._id)
         });
     } else {

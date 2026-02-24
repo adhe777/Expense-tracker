@@ -1,56 +1,64 @@
-# Expense Tracker
+# Personal Finance Tracker using MERN Stack
 
-A full-stack expense tracking application built with React, Node.js, and MongoDB.
+A comprehensive full-stack ecosystem for the strategic management of personal wealth, integrating income management, expense tracking, savings monitoring, and proactive budget planning. 
 
-## Getting Started on a New PC
+---
 
-Follow these steps to set up and run the project locally.
+## 🏗️ Project Overview
 
-### 1. Clone the Repository
+The **Personal Finance Tracker** is a submission-ready academic project built with the **MERN Stack**. It addresses the limitations of manual financial systems by providing a secure, automated, and analytical platform for achieving long-term financial discipline.
+
+### Core Pillars
+- **Income Management**: Consolidated tracking of diverse revenue streams.
+- **Expense Control**: Dynamic logging and categorization of all expenditures.
+- **Budget Planning**: Setting and monitoring category-wise spending limits.
+- **Savings Analysis**: Real-time monitoring of net worth and financial trends.
+- **AI-Powered Insights**: Integrated forecasting of spending patterns (future enhancement).
+
+---
+
+## 🚀 Installation and Setup
+
+### 1. Prerequisite
+Ensure you have **Node.js** and **MongoDB** installed on your system.
+
+### 2. Clone the Repository
 ```bash
 git clone https://github.com/adhe777/Expense-tracker.git
 cd Expense-tracker
 ```
 
-### 2. Backend Setup
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
+### 3. Backend Implementation
+1. `cd backend`
+2. `npm install`
+3. Configure your environment in a `.env` file:
+   ```env
+   PORT=8081
+   MONGO_URI=your_mongodb_connection_string
+   JWT_SECRET=your_jwt_secret
    ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Create a `.env` file in the `backend` folder (you can use `.env.example` as a template):
-   ```bash
-   cp .env.example .env
-   ```
-4. Update the `.env` file with your **MongoDB connection string** and other configurations.
+4. `npm run dev`
 
-### 3. Frontend Setup
-1. Navigate to the frontend directory:
-   ```bash
-   cd ../frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+### 4. Frontend Implementation
+1. `cd ../frontend`
+2. `npm install`
+3. `npm run dev`
 
-### 4. Running the Application
+---
 
-#### Start the Backend
-In the `backend` folder:
-```bash
-npm run dev
-```
-*Note: Make sure your backend port matches what the frontend expects (currently hardcoded to `8081` in `AuthContext.jsx`).*
+## 🎓 Academic Submission
 
-#### Start the Frontend
-In the `frontend` folder:
-```bash
-npm run dev
-```
+This project is fully documented for college submission.
+- **Full Formal Report**: [DOCUMENTATION.md](./DOCUMENTATION.md)
+- **Technical Architecture**: See diagrams in the full report.
 
-## Contributing
-Feel free to open issues or pull requests.
+### Key Components
+- **Frontend**: React.js / CSS3
+- **Backend**: Node.js / Express.js
+- **Database**: MongoDB (NoSQL)
+- **Security**: JWT Authentication / Bcrypt Hashing
+
+---
+
+## 📜 Academic Disclaimer
+This project is developed for educational purposes to demonstrate the practical application of the MERN stack in solving financial management challenges.

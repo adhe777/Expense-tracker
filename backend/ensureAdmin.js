@@ -1,37 +1,37 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const bcrypt = require('bcryptjs');
 const User = require('./models/userModel');
+const bcrypt = require('bcryptjs');
 
 dotenv.config();
 
-const ensureAdmin = async () => {
+const seedAdmin = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URI);
-        const email = 'admin@expense.com';
-        let user = await User.findOne({ email });
+        console.log('MongoDB Connected...');
 
-        if (!user) {
-            console.log('Admin user not found, creating one...');
-            user = await User.create({
-                name: 'System Admin',
-                email: email,
-                password: 'admin123', // Will be hashed by pre-save hook
-                isAdmin: true
-            });
-            console.log('Admin user created successfully.');
-        } else {
-            user.isAdmin = true;
-            await user.save();
-            console.log('Admin user updated successfully.');
+        // Remove old admin if exists with different email
+        await User.deleteMany({ role: 'admin' });
+
+        // Note: Password will be hashed by the pre-save hook in userModel.js
+        const adminUser = await User.create({
+            name: 'System Admin',
+            email: 'admin@gmail.com',
+            password: 'admin123',
+            role: 'admin'
+        });
+
+        if (adminUser) {
+            console.log('Admin created successfully!');
+            console.log('Email: admin@gmail.com');
+            console.log('Password: admin123');
         }
 
-        console.log(`Current Admin Status: ${user.isAdmin}`);
         process.exit();
     } catch (error) {
-        console.error(error);
+        console.error(`Error: ${error.message}`);
         process.exit(1);
     }
 };
 
-ensureAdmin();
+seedAdmin();

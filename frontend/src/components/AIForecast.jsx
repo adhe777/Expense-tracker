@@ -20,7 +20,9 @@ const AIForecast = () => {
         fetchPrediction();
     }, []);
 
-    if (loading) return <div className="card">Analyzing spending patterns...</div>;
+    if (loading) return <div className="card" style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#64748b' }}>
+        <BrainCircuit className="spin-slow" style={{ marginRight: '10px' }} /> Analyzing spending patterns...
+    </div>;
     if (!data || data.prediction === 0) {
         return (
             <div className="card" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px dashed #cbd5e1' }}>

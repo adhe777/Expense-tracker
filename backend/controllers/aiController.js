@@ -63,4 +63,60 @@ const predictSpending = async (req, res) => {
     }
 };
 
-module.exports = { predictSpending };
+const getPredictExpense = async (req, res) => {
+    try {
+        const transactions = await Transaction.find({ user: req.user.id, type: 'expense' }).sort({ date: 1 });
+
+        if (transactions.length === 0) {
+            return res.status(200).json({ history: [], prediction: 0 });
+        }
+
+        // Group by month
+        const monthlyData = {};
+        transactions.forEach(t => {
+            const date = new Date(t.date);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            monthlyData[monthKey] = (monthlyData[monthKey] || 0) + t.amount;
+        });
+
+        const history = Object.entries(monthlyData).map(([month, total]) => ({ month, total }));
+
+        // Need at least 2 points for regression
+        if (history.length < 2) {
+            return res.status(200).json({
+                history,
+                prediction: history[history.length - 1].total,
+                message: "Need at least 2 months of data for a trend prediction."
+            });
+        }
+
+        // Manual Linear Regression (y = mx + b)
+        // x = month index (0, 1, 2...), y = total expense
+        const n = history.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+        history.forEach((data, i) => {
+            sumX += i;
+            sumY += data.total;
+            sumXY += (i * data.total);
+            sumX2 += (i * i);
+        });
+
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+
+        // Predict next month (index n)
+        let prediction = slope * n + intercept;
+        if (prediction < 0) prediction = 0;
+
+        res.status(200).json({
+            history,
+            prediction: Math.round(prediction)
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { predictSpending, getPredictExpense };

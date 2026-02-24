@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const Login = () => {
+const Login = ({ title = "Personal Finance Tracker" }) => {
     const [isRegister, setIsRegister] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -24,9 +24,9 @@ const Login = () => {
     return (
         <div className="auth-container">
             <div className="auth-card">
-                <h2 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-                    {isRegister ? 'Create Account' : 'Welcome Back'}
-                </h2>
+                <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '-0.025em' }}>
+                    {title}
+                </h1>
                 <form onSubmit={handleSubmit}>
                     {isRegister && (
                         <div className="input-group">

@@ -55,19 +55,42 @@ const deleteTransaction = async (req, res) => {
 const getStats = async (req, res) => {
     try {
         const transactions = await Transaction.find({ user: req.user.id });
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
 
         let totalIncome = 0;
         let totalExpense = 0;
+        let monthlyIncome = 0;
+        let monthlyExpense = 0;
 
         transactions.forEach(t => {
-            if (t.type === 'income') totalIncome += t.amount;
-            else totalExpense += t.amount;
+            const tDate = new Date(t.date);
+            if (t.type === 'income') {
+                totalIncome += t.amount;
+                if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
+                    monthlyIncome += t.amount;
+                }
+            } else {
+                totalExpense += t.amount;
+                if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
+                    monthlyExpense += t.amount;
+                }
+            }
         });
+
+        const netSavings = totalIncome - totalExpense;
+        const monthlySavings = monthlyIncome - monthlyExpense;
+        const savingsRate = monthlyIncome > 0 ? ((monthlySavings / monthlyIncome) * 100).toFixed(1) : 0;
 
         res.status(200).json({
             totalIncome,
             totalExpense,
-            balance: totalIncome - totalExpense,
+            balance: netSavings,
+            monthlyIncome,
+            monthlyExpense,
+            monthlySavings,
+            savingsRate,
             transactionCount: transactions.length
         });
     } catch (error) {

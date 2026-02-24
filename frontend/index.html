@@ -1,13 +1,41 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Expense Tracker | MERN Project</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker | MERN Project</title>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --bg-main: #f8fafc;
+      --text-primary: #1e293b;
+      --bg-card: #ffffff;
+    }
+
+    body {
+      margin: 0;
+      background-color: #f8fafc;
+      color: #1e293b;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    #root {
+      transition: opacity 0.3s ease-in;
+    }
+  </style>
+  <script>
+    window.onerror = function (m, u, l) {
+      console.error(m, u, l);
+      document.body.innerHTML = '<div style="color:red;padding:2rem;background:white"><h3>Frontend Error</h3><p>' + m + '</p><small>' + u + ':' + l + '</small></div>';
+    };
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>

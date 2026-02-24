@@ -7,8 +7,8 @@ dotenv.config();
 const promoteUser = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URI);
-        const email = 'admin@expense.com'; // Previously used during verification
-        const user = await User.findOneAndUpdate({ email }, { isAdmin: true }, { new: true });
+        const email = 'admin@gmail.com';
+        const user = await User.findOneAndUpdate({ email }, { role: 'admin' }, { new: true });
 
         if (user) {
             console.log(`User ${user.name} (${user.email}) promoted to Admin successfully!`);
