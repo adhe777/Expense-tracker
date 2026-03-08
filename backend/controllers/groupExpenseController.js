@@ -1,136 +1,198 @@
+const asyncHandler = require('express-async-handler');
 const Transaction = require('../models/transactionModel');
 const Split = require('../models/splitModel');
 const Group = require('../models/groupModel');
 
-// @desc    Add a group expense and create splits
+// @desc    Add a group expense and calculate splits
 // @route   POST /api/group/expense
 // @access  Private
-const addGroupExpense = async (req, res) => {
-    const { title, amount, category, date, description, groupId, splitType, splitData } = req.body;
+const addGroupExpense = asyncHandler(async (req, res) => {
+    const { groupId, title, amount, category, description, splitType, customSplits } = req.body;
 
-    try {
-        const group = await Group.findById(groupId);
-        if (!group || !group.members.includes(req.user.id)) {
-            return res.status(403).json({ message: 'Not authorized or group not found' });
-        }
-
-        // Create the transaction record
-        const transaction = await Transaction.create({
-            user: req.user.id,
-            title,
-            amount,
-            category,
-            type: 'expense',
-            date,
-            description,
-            groupId,
-            isGroupExpense: true
-        });
-
-        // Calculate owes based on split type
-        let owes = [];
-        const memberCount = group.members.length;
-
-        if (splitType === 'equal') {
-            const splitAmount = amount / memberCount;
-            owes = group.members
-                .filter(id => id.toString() !== req.user.id)
-                .map(id => ({ userId: id, amount: splitAmount }));
-        } else if (splitType === 'percentage') {
-            // splitData format: [{ userId: '...', percentage: 25 }]
-            owes = splitData
-                .filter(s => s.userId !== req.user.id)
-                .map(s => ({ userId: s.userId, amount: (amount * s.percentage) / 100 }));
-        } else if (splitType === 'custom') {
-            // splitData format: [{ userId: '...', amount: 500 }]
-            owes = splitData
-                .filter(s => s.userId !== req.user.id)
-                .map(s => ({ userId: s.userId, amount: s.amount }));
-        }
-
-        const split = await Split.create({
-            expenseId: transaction._id,
-            groupId,
-            payer: req.user.id,
-            owes
-        });
-
-        res.status(201).json({ transaction, split });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    const group = await Group.findById(groupId);
+    if (!group) {
+        res.status(404);
+        throw new Error('Group not found');
     }
-};
 
-// @desc    Get settlement summary for a group
+    if (!group.members.includes(req.user.id)) {
+        res.status(403);
+        throw new Error('User not part of group');
+    }
+
+    // 1. Create the Transaction
+    const transaction = await Transaction.create({
+        user: req.user.id,
+        groupId,
+        isGroupExpense: true,
+        title,
+        amount: Number(amount),
+        type: 'expense',
+        category,
+        description
+    });
+
+    // 2. Calculate Split amounts
+    let owes = [];
+    const members = group.members;
+    const totalAmount = Number(amount);
+
+    if (splitType === 'equal') {
+        const splitAmount = (totalAmount / members.length).toFixed(2);
+        members.forEach(memberId => {
+            if (memberId.toString() !== req.user.id) {
+                owes.push({ user: memberId, amount: Number(splitAmount) });
+            }
+        });
+    } else if (splitType === 'percentage') {
+        // customSplits = [{ user: "id", value: 40 }, { user: "id2", value: 60 }]
+        let percentTotal = 0;
+        customSplits.forEach(split => { percentTotal += Number(split.value); });
+
+        if (percentTotal !== 100) {
+            await transaction.deleteOne(); // Rollback
+            res.status(400);
+            throw new Error('Percentages must add up to 100');
+        }
+
+        customSplits.forEach(split => {
+            if (split.user.toString() !== req.user.id) {
+                const owesAmount = (totalAmount * (Number(split.value) / 100)).toFixed(2);
+                if (Number(owesAmount) > 0) {
+                    owes.push({ user: split.user, amount: Number(owesAmount) });
+                }
+            }
+        });
+    } else if (splitType === 'custom') {
+        // customSplits = [{ user: "id", value: 500 }, { user: "id2", value: 300 }]
+        let amTotal = 0;
+        customSplits.forEach(split => { amTotal += Number(split.value); });
+
+        if (amTotal !== totalAmount) {
+            await transaction.deleteOne(); // Rollback
+            res.status(400);
+            throw new Error('Custom amounts must equal total transaction amount');
+        }
+
+        customSplits.forEach(split => {
+            if (split.user.toString() !== req.user.id && Number(split.value) > 0) {
+                owes.push({ user: split.user, amount: Number(split.value) });
+            }
+        });
+    } else {
+        await transaction.deleteOne();
+        res.status(400);
+        throw new Error('Invalid split type');
+    }
+
+    // 3. Save Split Record
+    const split = await Split.create({
+        expenseId: transaction._id,
+        groupId,
+        payer: req.user.id,
+        owes
+    });
+
+    // Populate split before returning
+    const populatedSplit = await Split.findById(split._id)
+        .populate('payer', 'name')
+        .populate('owes.user', 'name');
+
+    res.status(201).json({ transaction, split: populatedSplit });
+});
+
+// @desc    Get all split summaries for a group
+// @route   GET /api/group/split-summary/:groupId
+// @access  Private
+const getSplitSummary = asyncHandler(async (req, res) => {
+    const groupId = req.params.groupId;
+
+    // Optional Check Membership
+    const group = await Group.findById(groupId);
+    if (!group.members.includes(req.user.id)) {
+        res.status(403);
+        throw new Error('Not authorized');
+    }
+
+    const splits = await Split.find({ groupId })
+        .populate('payer', 'name')
+        .populate('owes.user', 'name')
+        .populate('expenseId', 'title amount date')
+        .sort({ createdAt: -1 });
+
+    res.status(200).json(splits);
+});
+
+// @desc    Calculate Net Settlements
 // @route   GET /api/group/settlement/:groupId
 // @access  Private
-const getSettlement = async (req, res) => {
-    try {
-        const groupId = req.params.groupId;
-        const splits = await Split.find({ groupId }).populate('payer', 'name').populate('owes.userId', 'name');
+const getSettlements = asyncHandler(async (req, res) => {
+    const groupId = req.params.groupId;
+    const splits = await Split.find({ groupId }).populate('payer', 'name').populate('owes.user', 'name');
 
-        // Calculate net balance for each user
-        // balanceMap[userId] = amount (positive means they are owed, negative means they owe)
-        const balanceMap = {};
+    // Balance Sheet mapping user id to net balance (positive means they should receive, negative means they owe)
+    const balances = {};
+    const names = {};
 
-        splits.forEach(split => {
-            const payerId = split.payer._id.toString();
+    splits.forEach(split => {
+        const payerId = split.payer._id.toString();
+        names[payerId] = split.payer.name;
 
-            split.owes.forEach(owe => {
-                const owerId = owe.userId._id.toString();
-                const amount = owe.amount;
+        if (!balances[payerId]) balances[payerId] = 0;
 
-                // Payer is owed this amount
-                balanceMap[payerId] = (balanceMap[payerId] || 0) + amount;
-                // Ower owes this amount
-                balanceMap[owerId] = (balanceMap[owerId] || 0) - amount;
-            });
+        split.owes.forEach(debt => {
+            const debtorId = debt.user._id.toString();
+            names[debtorId] = debt.user.name;
+
+            if (!balances[debtorId]) balances[debtorId] = 0;
+
+            // Payer gets money back (+)
+            balances[payerId] += debt.amount;
+            // Debtor owes money (-)
+            balances[debtorId] -= debt.amount;
+        });
+    });
+
+    const debtors = [];
+    const creditors = [];
+
+    // Separate into debtors (<0) and creditors (>0)
+    for (const [userId, amount] of Object.entries(balances)) {
+        if (amount < -0.01) debtors.push({ userId, name: names[userId], amount: Math.abs(amount) });
+        if (amount > 0.01) creditors.push({ userId, name: names[userId], amount });
+    }
+
+    const settlements = [];
+
+    // Greedy settlement algorithm
+    let i = 0; // debtors index
+    let j = 0; // creditors index
+
+    while (i < debtors.length && j < creditors.length) {
+        const debtor = debtors[i];
+        const creditor = creditors[j];
+
+        const minAmount = Math.min(debtor.amount, creditor.amount);
+
+        settlements.push({
+            from: debtor.name,
+            to: creditor.name,
+            amount: minAmount.toFixed(2),
+            message: `${debtor.name} owes ${creditor.name} ₹${minAmount.toFixed(2)}`
         });
 
-        // Simplify settlements (who owes whom)
-        const settlements = [];
-        const debtors = []; // negative balance
-        const creditors = []; // positive balance
+        debtor.amount -= minAmount;
+        creditor.amount -= minAmount;
 
-        for (const [userId, balance] of Object.entries(balanceMap)) {
-            if (balance < 0) debtors.push({ userId, balance: Math.abs(balance) });
-            else if (balance > 0) creditors.push({ userId, balance });
-        }
-
-        // Basic greedy algorithm for simplified settlement
-        let d = 0, c = 0;
-        while (d < debtors.length && c < creditors.length) {
-            const amount = Math.min(debtors[d].balance, creditors[c].balance);
-
-            settlements.push({
-                from: debtors[d].userId,
-                to: creditors[c].userId,
-                amount: Math.round(amount * 100) / 100
-            });
-
-            debtors[d].balance -= amount;
-            creditors[c].balance -= amount;
-
-            if (debtors[d].balance === 0) d++;
-            if (creditors[c].balance === 0) c++;
-        }
-
-        // Map IDs to names for readability
-        const group = await Group.findById(groupId).populate('members', 'name');
-        const nameMap = {};
-        group.members.forEach(m => nameMap[m._id.toString()] = m.name);
-
-        const readableSettlements = settlements.map(s => ({
-            text: `${nameMap[s.from]} owes ${nameMap[s.to]} ₹${s.amount.toLocaleString()}`,
-            from: nameMap[s.from],
-            to: nameMap[s.to],
-            amount: s.amount
-        }));
-
-        res.status(200).json(readableSettlements);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+        if (debtor.amount < 0.01) i++;
+        if (creditor.amount < 0.01) j++;
     }
-};
 
-module.exports = { addGroupExpense, getSettlement };
+    res.status(200).json(settlements);
+});
+
+module.exports = {
+    addGroupExpense,
+    getSplitSummary,
+    getSettlements
+};

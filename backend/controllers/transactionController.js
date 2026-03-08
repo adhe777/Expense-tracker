@@ -2,7 +2,7 @@ const Transaction = require('../models/transactionModel');
 
 const getTransactions = async (req, res) => {
     try {
-        const transactions = await Transaction.find({ user: req.user.id }).sort({ date: -1 });
+        const transactions = await Transaction.find({ user: req.user.id, isGroupExpense: false }).sort({ date: -1 });
         res.status(200).json(transactions);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -10,7 +10,7 @@ const getTransactions = async (req, res) => {
 };
 
 const addTransaction = async (req, res) => {
-    const { title, amount, type, category, date, description } = req.body;
+    const { title, amount, type, category, date, description, isGroupExpense, groupId } = req.body;
 
     if (!title || !amount || !type || !category) {
         return res.status(400).json({ message: 'Please add all required fields' });
@@ -24,7 +24,9 @@ const addTransaction = async (req, res) => {
             type,
             category,
             date,
-            description
+            description,
+            isGroupExpense: isGroupExpense || false,
+            groupId: isGroupExpense ? groupId : null
         });
         res.status(201).json(transaction);
     } catch (error) {
@@ -54,7 +56,7 @@ const deleteTransaction = async (req, res) => {
 
 const getStats = async (req, res) => {
     try {
-        const transactions = await Transaction.find({ user: req.user.id });
+        const transactions = await Transaction.find({ user: req.user.id, isGroupExpense: false });
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();

@@ -14,7 +14,15 @@ const userSchema = mongoose.Schema({
     password: {
         type: String,
         required: [true, 'Please add a password']
-    }
+    },
+    avatar: {
+        type: String,
+        default: ''
+    },
+    groups: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Group'
+    }]
 }, {
     timestamps: true
 });

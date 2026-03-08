@@ -1,23 +1,23 @@
 const mongoose = require('mongoose');
 
-const splitSchema = mongoose.Schema({
+const splitSchema = new mongoose.Schema({
     expenseId: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true,
-        ref: 'Transaction'
+        ref: 'Transaction',
+        required: true
     },
     groupId: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true,
-        ref: 'Group'
+        ref: 'Group',
+        required: true
     },
     payer: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true,
-        ref: 'User'
+        ref: 'User',
+        required: true
     },
     owes: [{
-        userId: {
+        user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true
@@ -27,8 +27,6 @@ const splitSchema = mongoose.Schema({
             required: true
         }
     }]
-}, {
-    timestamps: true
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('Split', splitSchema);

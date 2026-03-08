@@ -17,6 +17,7 @@ const registerUser = async (req, res) => {
             _id: user.id,
             name: user.name,
             email: user.email,
+            groups: user.groups,
             token: generateToken(user._id)
         });
     } else {
@@ -27,13 +28,14 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).populate('groups', 'groupName');
 
     if (user && (await user.matchPassword(password))) {
         res.json({
             _id: user.id,
             name: user.name,
             email: user.email,
+            groups: user.groups,
             token: generateToken(user._id)
         });
     } else {
@@ -42,7 +44,8 @@ const loginUser = async (req, res) => {
 };
 
 const getMe = async (req, res) => {
-    res.status(200).json(req.user);
+    const user = await User.findById(req.user.id).populate('groups', 'groupName');
+    res.status(200).json(user);
 };
 
 const generateToken = (id) => {

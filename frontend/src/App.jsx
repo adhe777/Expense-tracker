@@ -3,6 +3,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Budgets from './pages/Budgets';
+import GroupDashboard from './pages/GroupDashboard';
+import ProfileSettings from './pages/ProfileSettings';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
 import './index.css';
 
 const AppContent = () => {
@@ -33,18 +37,33 @@ const AppContent = () => {
         return <Budgets onBack={() => navigate('/')} />;
     }
 
+    if (path.startsWith('/group/')) {
+        const groupId = path.split('/')[2];
+        return <GroupDashboard groupId={groupId} onBack={() => navigate('/')} />;
+    }
+
+    if (path === '/profile') {
+        return <ProfileSettings onBack={() => navigate('/')} />;
+    }
+
     return (
         <Dashboard
             onBudgets={() => navigate('/budgets')}
+            onProfile={() => navigate('/profile')}
+            onGroupView={(groupId) => navigate(`/group/${groupId}`)}
         />
     );
 };
 
 function App() {
     return (
-        <AuthProvider>
-            <AppContent />
-        </AuthProvider>
+        <ThemeProvider>
+            <BrowserRouter>
+                <AuthProvider>
+                    <AppContent />
+                </AuthProvider>
+            </BrowserRouter>
+        </ThemeProvider>
     );
 }
 

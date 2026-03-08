@@ -30,6 +30,14 @@ const transactionSchema = mongoose.Schema({
     },
     description: {
         type: String
+    },
+    groupId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Group'
+    },
+    isGroupExpense: {
+        type: Boolean,
+        default: false
     }
 }, {
     timestamps: true

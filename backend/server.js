@@ -22,6 +22,8 @@ app.use('/api/transactions', require('./routes/transactionRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));
 app.use('/api/budgets', require('./routes/budgetRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
+app.use('/api/group', require('./routes/groupRoutes'));
+app.use('/api/profile', require('./routes/profileRoutes'));
 
 const PORT = process.env.PORT || 8000;
 

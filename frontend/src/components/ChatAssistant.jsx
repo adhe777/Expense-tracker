@@ -75,7 +75,8 @@ const ChatAssistant = () => {
             right: '2rem',
             width: '350px',
             height: '500px',
-            background: 'white',
+            background: 'var(--bg-card)',
+            color: 'var(--text-primary)',
             borderRadius: '1.25rem',
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
             display: 'flex',
@@ -108,7 +109,7 @@ const ChatAssistant = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '1rem',
-                background: '#f8fafc'
+                background: 'var(--bg-main)'
             }}>
                 {messages.map((m, i) => (
                     <div key={i} style={{
@@ -123,7 +124,7 @@ const ChatAssistant = () => {
                             borderRadius: '1rem',
                             fontSize: '0.875rem',
                             lineHeight: 1.5,
-                            background: m.role === 'user' ? 'var(--primary)' : 'white',
+                            background: m.role === 'user' ? 'var(--primary)' : 'var(--bg-card)',
                             color: m.role === 'user' ? 'white' : 'var(--text-primary)',
                             boxShadow: m.role === 'user' ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
                             border: m.role === 'user' ? 'none' : '1px solid var(--border)',
@@ -135,7 +136,7 @@ const ChatAssistant = () => {
                     </div>
                 ))}
                 {isLoading && (
-                    <div style={{ alignSelf: 'flex-start', background: 'white', padding: '0.75rem 1rem', borderRadius: '1rem', border: '1px solid var(--border)', fontSize: '0.875rem' }}>
+                    <div style={{ alignSelf: 'flex-start', background: 'var(--bg-card)', color: 'var(--text-primary)', padding: '0.75rem 1rem', borderRadius: '1rem', border: '1px solid var(--border)', fontSize: '0.875rem' }}>
                         Thinking...
                     </div>
                 )}
@@ -145,7 +146,7 @@ const ChatAssistant = () => {
             {/* Input */}
             <form onSubmit={handleSend} style={{
                 padding: '1rem',
-                background: 'white',
+                background: 'var(--bg-card)',
                 borderTop: '1px solid var(--border)',
                 display: 'flex',
                 gap: '0.5rem'
@@ -159,6 +160,8 @@ const ChatAssistant = () => {
                         flex: 1,
                         padding: '0.625rem 1rem',
                         borderRadius: '2rem',
+                        background: 'var(--bg-main)',
+                        color: 'var(--text-primary)',
                         border: '1px solid var(--border)',
                         outline: 'none',
                         fontSize: '0.875rem'

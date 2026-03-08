@@ -5,7 +5,14 @@ const Transaction = require('../models/transactionModel');
 // @access  Private
 const predictSpending = async (req, res) => {
     try {
-        const transactions = await Transaction.find({ user: req.user.id, type: 'expense' }).sort({ date: 1 });
+        let query = { user: req.user.id, type: 'expense' };
+
+        // Enhance for Group Level insights
+        if (req.query.groupId) {
+            query = { groupId: req.query.groupId, type: 'expense' };
+        }
+
+        const transactions = await Transaction.find(query).sort({ date: 1 });
 
         if (transactions.length < 5) {
             return res.status(200).json({
@@ -65,7 +72,14 @@ const predictSpending = async (req, res) => {
 
 const getPredictExpense = async (req, res) => {
     try {
-        const transactions = await Transaction.find({ user: req.user.id, type: 'expense' }).sort({ date: 1 });
+        let query = { user: req.user.id, type: 'expense' };
+
+        // Enhance for Group Level insights
+        if (req.query.groupId) {
+            query = { groupId: req.query.groupId, type: 'expense' };
+        }
+
+        const transactions = await Transaction.find(query).sort({ date: 1 });
 
         if (transactions.length === 0) {
             return res.status(200).json({ history: [], prediction: 0 });
