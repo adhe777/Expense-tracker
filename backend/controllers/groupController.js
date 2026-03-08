@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Group = require('../models/groupModel');
 const User = require('../models/userModel');
+const Notification = require('../models/notificationModel');
 
 // @desc    Create a new group
 // @route   POST /api/group/create
@@ -57,16 +58,62 @@ const inviteMember = asyncHandler(async (req, res) => {
         throw new Error('User is already a member of this group');
     }
 
-    // Add to group members
-    group.members.push(invitee._id);
-    await group.save();
-
-    // Add group to user's groups
-    await User.findByIdAndUpdate(invitee._id, {
-        $push: { groups: group._id }
+    // Check if an invite is already pending
+    const existingInvite = await Notification.findOne({
+        recipient: invitee._id,
+        relatedGroup: group._id,
+        type: 'group_invite',
+        status: 'pending'
     });
 
-    res.status(200).json({ message: 'User invited successfully', group });
+    if (existingInvite) {
+        res.status(400);
+        throw new Error('An invite is already pending for this user');
+    }
+
+    // Create a Notification instead of adding them directly
+    await Notification.create({
+        recipient: invitee._id,
+        sender: req.user.id,
+        type: 'group_invite',
+        relatedGroup: group._id
+    });
+
+    res.status(200).json({ message: 'User invited successfully. They must accept the invite to join.' });
+});
+
+// @desc    Remove member from group (Admin only)
+// @route   POST /api/group/remove
+// @access  Private
+const removeMember = asyncHandler(async (req, res) => {
+    const { groupId, memberId } = req.body;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+        res.status(404);
+        throw new Error('Group not found');
+    }
+
+    if (group.createdBy.toString() !== req.user.id) {
+        res.status(403);
+        throw new Error('Only the group admin can remove members');
+    }
+
+    if (group.createdBy.toString() === memberId) {
+        res.status(400);
+        throw new Error('Admin cannot be removed.');
+    }
+
+    // Remove user from group members
+    group.members = group.members.filter(m => m.toString() !== memberId);
+    await group.save();
+
+    // Remove group from user's groups array
+    await User.findByIdAndUpdate(memberId, {
+        $pull: { groups: group._id }
+    });
+
+    res.status(200).json({ message: 'Member removed successfully' });
 });
 
 // @desc    Delete a group
@@ -146,10 +193,74 @@ const leaveGroup = asyncHandler(async (req, res) => {
     res.status(200).json({ message: 'Left group successfully' });
 });
 
+// @desc    Get user notifications
+// @route   GET /api/group/notifications
+// @access  Private
+const getNotifications = asyncHandler(async (req, res) => {
+    const notifications = await Notification.find({ recipient: req.user.id, status: 'pending' })
+        .populate('sender', 'name')
+        .populate('relatedGroup', 'groupName')
+        .sort({ createdAt: -1 });
+    res.status(200).json(notifications);
+});
+
+// @desc    Accept group invite
+// @route   POST /api/group/invite/accept/:notificationId
+// @access  Private
+const acceptInvite = asyncHandler(async (req, res) => {
+    const notification = await Notification.findById(req.params.notificationId);
+
+    if (!notification || notification.recipient.toString() !== req.user.id) {
+        res.status(404);
+        throw new Error('Notification not found');
+    }
+
+    const group = await Group.findById(notification.relatedGroup);
+    if (!group) {
+        res.status(404);
+        throw new Error('Group not found');
+    }
+
+    if (!group.members.includes(req.user.id)) {
+        group.members.push(req.user.id);
+        await group.save();
+
+        await User.findByIdAndUpdate(req.user.id, {
+            $push: { groups: group._id }
+        });
+    }
+
+    notification.status = 'accepted';
+    await notification.save();
+
+    res.status(200).json({ message: 'Invite accepted', group });
+});
+
+// @desc    Reject group invite
+// @route   POST /api/group/invite/reject/:notificationId
+// @access  Private
+const rejectInvite = asyncHandler(async (req, res) => {
+    const notification = await Notification.findById(req.params.notificationId);
+
+    if (!notification || notification.recipient.toString() !== req.user.id) {
+        res.status(404);
+        throw new Error('Notification not found');
+    }
+
+    notification.status = 'rejected';
+    await notification.save();
+
+    res.status(200).json({ message: 'Invite rejected' });
+});
+
 module.exports = {
     createGroup,
     inviteMember,
+    removeMember,
     deleteGroup,
     getGroupDetails,
-    leaveGroup
+    leaveGroup,
+    getNotifications,
+    acceptInvite,
+    rejectInvite
 };

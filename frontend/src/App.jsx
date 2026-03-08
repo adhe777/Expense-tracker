@@ -7,6 +7,7 @@ import GroupDashboard from './pages/GroupDashboard';
 import ProfileSettings from './pages/ProfileSettings';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
+import { Toaster } from 'react-hot-toast';
 import './index.css';
 
 const AppContent = () => {
@@ -58,6 +59,7 @@ const AppContent = () => {
 function App() {
     return (
         <ThemeProvider>
+            <Toaster position="top-right" toastOptions={{ duration: 3000, style: { background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' } }} />
             <BrowserRouter>
                 <AuthProvider>
                     <AppContent />

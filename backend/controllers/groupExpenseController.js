@@ -175,7 +175,9 @@ const getSettlements = asyncHandler(async (req, res) => {
         const minAmount = Math.min(debtor.amount, creditor.amount);
 
         settlements.push({
+            fromId: debtor.userId,
             from: debtor.name,
+            toId: creditor.userId,
             to: creditor.name,
             amount: minAmount.toFixed(2),
             message: `${debtor.name} owes ${creditor.name} ₹${minAmount.toFixed(2)}`
@@ -191,8 +193,52 @@ const getSettlements = asyncHandler(async (req, res) => {
     res.status(200).json(settlements);
 });
 
+// @desc    Settle a debt
+// @route   POST /api/group/settle
+// @access  Private
+const settleDebt = asyncHandler(async (req, res) => {
+    const { groupId, toUserId, amount } = req.body;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+        res.status(404);
+        throw new Error('Group not found');
+    }
+
+    if (!group.members.includes(req.user.id) || !group.members.includes(toUserId)) {
+        res.status(403);
+        throw new Error('Both users must be part of the group');
+    }
+
+    // Create a settlement transaction
+    const transaction = await Transaction.create({
+        user: req.user.id,
+        groupId,
+        isGroupExpense: true,
+        title: 'Settlement Payment',
+        amount: Number(amount),
+        type: 'expense',
+        category: 'Settlement',
+        description: 'Payment to settle an outstanding balance'
+    });
+
+    // Create an inverse split to cancel the debt
+    // Payer is req.user.id, the person who made the payment.
+    // They are effectively paying 'toUserId'. In the split system, this means they paid the entire amount,
+    // and 'toUserId' consumed the entire amount, which zeroes the balance.
+    const split = await Split.create({
+        expenseId: transaction._id,
+        groupId,
+        payer: req.user.id,
+        owes: [{ user: toUserId, amount: Number(amount) }]
+    });
+
+    res.status(200).json({ message: 'Debt settled successfully', transaction, split });
+});
+
 module.exports = {
     addGroupExpense,
     getSplitSummary,
-    getSettlements
+    getSettlements,
+    settleDebt
 };

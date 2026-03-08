@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:8081/api';
 
-// Create instance with auth header from localStorage
+// Create instance with auth header from sessionStorage
 const getAuthHeaders = () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     return user?.token ? { Authorization: `Bearer ${user.token}` } : {};
 };
 
@@ -61,6 +61,30 @@ export const groupService = {
         });
         return response.data;
     },
+    removeMember: async (removeData) => {
+        const response = await axios.post(`${API_URL}/group/remove`, removeData, {
+            headers: getAuthHeaders()
+        });
+        return response.data;
+    },
+    getNotifications: async () => {
+        const response = await axios.get(`${API_URL}/group/user/notifications`, {
+            headers: getAuthHeaders()
+        });
+        return response.data;
+    },
+    acceptInvite: async (notificationId) => {
+        const response = await axios.post(`${API_URL}/group/invite/accept/${notificationId}`, {}, {
+            headers: getAuthHeaders()
+        });
+        return response.data;
+    },
+    rejectInvite: async (notificationId) => {
+        const response = await axios.post(`${API_URL}/group/invite/reject/${notificationId}`, {}, {
+            headers: getAuthHeaders()
+        });
+        return response.data;
+    },
     addGroupExpense: async (expenseData) => {
         const response = await axios.post(`${API_URL}/group/expense`, expenseData, {
             headers: getAuthHeaders()
@@ -75,6 +99,12 @@ export const groupService = {
     },
     getSettlements: async (groupId) => {
         const response = await axios.get(`${API_URL}/group/settlement/${groupId}`, {
+            headers: getAuthHeaders()
+        });
+        return response.data;
+    },
+    settleDebt: async (settleData) => {
+        const response = await axios.post(`${API_URL}/group/settle`, settleData, {
             headers: getAuthHeaders()
         });
         return response.data;

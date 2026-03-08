@@ -12,9 +12,11 @@ const processChat = async (req, res) => {
     const userId = req.user.id;
     const user = await User.findById(userId);
 
+    const userName = user ? user.name : "User";
+
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     try {
         // Fetch User's transactions for context
@@ -32,8 +34,8 @@ const processChat = async (req, res) => {
         }
 
         const prompt = `
-You are a witty, professional AI Financial Advisor named "Antigravity Finance Bot". 
-The user's name is ${user.name}. You are integrated into their Personal Finance Tracker dashboard.
+You are a witty, professional AI Financial Advisor named "Finance Bot". 
+The user's name is ${userName}. You are integrated into their Personal Finance Tracker dashboard.
 
 Here is their financial context:
 ${financialContext}

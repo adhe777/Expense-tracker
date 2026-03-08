@@ -3,6 +3,7 @@ backend/node_modules/
 backend/.env
 backend/dist/
 backend/build/
+backend/test*.js
 
 # Frontend
 frontend/node_modules/
@@ -17,3 +18,4 @@ frontend/.next/
 .DS_Store
 *.log
 node_modules/
+.vite/

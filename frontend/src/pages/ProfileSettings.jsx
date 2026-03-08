@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { profileService, groupService } from '../services/api';
 import { User, Mail, Lock, Camera, Users, LogOut, ShieldAlert } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 const ProfileSettings = ({ onBack }) => {
@@ -41,14 +42,14 @@ const ProfileSettings = ({ onBack }) => {
         e.preventDefault();
         try {
             const updated = await profileService.updateProfile({ name, email });
-            alert('Profile updated successfully!');
+            toast.success('Profile updated successfully!');
             // Update auth context too
-            const localUser = JSON.parse(localStorage.getItem('user'));
+            const localUser = JSON.parse(sessionStorage.getItem('user'));
             const newLocalUser = { ...localUser, name: updated.name, email: updated.email, avatar: updated.avatar };
-            localStorage.setItem('user', JSON.stringify(newLocalUser));
+            sessionStorage.setItem('user', JSON.stringify(newLocalUser));
             fetchProfile(); // refresh
         } catch (error) {
-            alert(error.response?.data?.message || 'Failed to update profile');
+            toast.error(error.response?.data?.message || 'Failed to update profile');
         }
     };
 
@@ -56,11 +57,11 @@ const ProfileSettings = ({ onBack }) => {
         e.preventDefault();
         try {
             await profileService.changePassword({ currentPassword, newPassword });
-            alert('Password changed successfully!');
+            toast.success('Password changed successfully!');
             setCurrentPassword('');
             setNewPassword('');
         } catch (error) {
-            alert(error.response?.data?.message || 'Failed to change password');
+            toast.error(error.response?.data?.message || 'Failed to change password');
         }
     };
 
@@ -74,15 +75,15 @@ const ProfileSettings = ({ onBack }) => {
             const base64String = reader.result;
             try {
                 const updated = await profileService.uploadAvatar({ avatarBase64: base64String });
-                alert('Avatar updated!');
+                toast.success('Avatar updated!');
 
-                const localUser = JSON.parse(localStorage.getItem('user'));
+                const localUser = JSON.parse(sessionStorage.getItem('user'));
                 const newLocalUser = { ...localUser, avatar: updated.avatar };
-                localStorage.setItem('user', JSON.stringify(newLocalUser));
+                sessionStorage.setItem('user', JSON.stringify(newLocalUser));
 
                 fetchProfile();
             } catch (error) {
-                alert('Avatar upload failed');
+                toast.error('Avatar upload failed');
             }
         };
     };
@@ -91,16 +92,16 @@ const ProfileSettings = ({ onBack }) => {
         if (!window.confirm("Are you sure you want to leave this group?")) return;
         try {
             await groupService.leaveGroup(groupId);
-            alert('You have left the group.');
+            toast.success('You have left the group.');
 
             // Sync local storage
-            const localUser = JSON.parse(localStorage.getItem('user'));
+            const localUser = JSON.parse(sessionStorage.getItem('user'));
             const newLocalUser = { ...localUser, groups: localUser.groups.filter(g => g._id !== groupId) };
-            localStorage.setItem('user', JSON.stringify(newLocalUser));
+            sessionStorage.setItem('user', JSON.stringify(newLocalUser));
 
             fetchProfile();
         } catch (error) {
-            alert(error.response?.data?.message || 'Failed to leave group');
+            toast.error(error.response?.data?.message || 'Failed to leave group');
         }
     };
 

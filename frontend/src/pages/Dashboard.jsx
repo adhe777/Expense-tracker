@@ -21,11 +21,14 @@ import {
     User,
     Sun,
     Moon,
-    Hexagon
+    Hexagon,
+    Bell // Added Bell icon for NotificationBell
 } from 'lucide-react';
 import AIForecast from '../components/AIForecast';
+import { toast } from 'react-hot-toast';
 import SmartPrediction from '../components/SmartPrediction';
 import ChatAssistant from '../components/ChatAssistant';
+import NotificationBell from '../components/NotificationBell'; // Added NotificationBell import
 import { groupService } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
@@ -37,7 +40,7 @@ const Dashboard = ({ onBudgets, onGroupView, onProfile }) => {
     const { user: authUser, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     // Group Modal State
     const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -125,8 +128,9 @@ const Dashboard = ({ onBudgets, onGroupView, onProfile }) => {
             }
             setFormData({ title: '', amount: '', type: 'expense', category: 'Food', isGroupExpense: false, groupId: '' });
             fetchData();
+            toast.success('Transaction added successfully!');
         } catch (err) {
-            alert('Failed to add transaction');
+            toast.error('Failed to add transaction');
         }
     };
 
@@ -136,8 +140,10 @@ const Dashboard = ({ onBudgets, onGroupView, onProfile }) => {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
             fetchData();
-        } catch (err) {
-            alert('Failed to delete transaction');
+            toast.success('Transaction deleted');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to delete transaction');
         }
     };
 
@@ -147,15 +153,19 @@ const Dashboard = ({ onBudgets, onGroupView, onProfile }) => {
             const data = await groupService.createGroup({ groupName: newGroupName, groupDescription: newGroupDescription }, user.token);
             // Update local user object to include the new group in the sidebar
             const updatedUser = { ...user, groups: [...(user.groups || []), data] };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
+            sessionStorage.setItem('user', JSON.stringify(updatedUser));
 
             setNewGroupName('');
             setNewGroupDescription('');
             setShowCreateGroup(false);
-            window.location.reload(); // Quick refresh to sync header and list
+
+            toast.success('Group created successfully!');
+            // Delay reload slightly so user sees the toast
+            setTimeout(() => window.location.reload(), 1500);
         } catch (err) {
-            console.error(err);
-            alert(err.response?.data?.message || 'Failed to create group');
+            console.error("Create group error:", err);
+            const errorMsg = err.response?.data?.message || 'Failed to create group. Please check the name.';
+            toast.error(errorMsg);
         }
     };
 
@@ -250,9 +260,18 @@ const Dashboard = ({ onBudgets, onGroupView, onProfile }) => {
 
             {/* Main Content */}
             <main style={{ flex: 1, padding: '2rem 3rem', overflowY: 'auto' }}>
-                <header style={{ marginBottom: '3rem' }}>
-                    <h1 style={{ fontSize: '2rem', fontWeight: 800 }}>Welcome Back, {user.name}</h1>
-                    <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Your decentralized financial workspace is ready.</p>
+                <header style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                        <h1 style={{ fontSize: '2rem', fontWeight: 800 }}>Welcome Back, {user.name}</h1>
+                        <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Your decentralized financial workspace is ready.</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <NotificationBell onUpdateGroups={(newGroup) => {
+                            const updatedUser = { ...user, groups: [...(user.groups || []), newGroup] };
+                            sessionStorage.setItem('user', JSON.stringify(updatedUser));
+                            window.location.reload();
+                        }} />
+                    </div>
                 </header>
 
                 <div className="grid-cols-3" style={{ marginBottom: '3rem' }}>
