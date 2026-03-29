@@ -19,6 +19,11 @@ const userSchema = mongoose.Schema({
         type: String,
         default: ''
     },
+    role: {
+        type: String,
+        enum: ['user', 'system_admin'],
+        default: 'user'
+    },
     groups: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Group'

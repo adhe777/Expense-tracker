@@ -15,9 +15,14 @@ const addGroupExpense = asyncHandler(async (req, res) => {
         throw new Error('Group not found');
     }
 
-    if (!group.members.includes(req.user.id)) {
+    if (!group.members.includes(req.user.id) && req.user.role !== 'system_admin') {
         res.status(403);
         throw new Error('User not part of group');
+    }
+
+    if (req.user.role === 'system_admin') {
+        res.status(403);
+        throw new Error('System admins are restricted from adding expenses. They are for monitoring only.');
     }
 
     // 1. Create the Transaction
@@ -38,10 +43,10 @@ const addGroupExpense = asyncHandler(async (req, res) => {
     const totalAmount = Number(amount);
 
     if (splitType === 'equal') {
-        const splitAmount = (totalAmount / members.length).toFixed(2);
+        const splitAmount = Math.floor((totalAmount / members.length) * 100) / 100;
         members.forEach(memberId => {
             if (memberId.toString() !== req.user.id) {
-                owes.push({ user: memberId, amount: Number(splitAmount) });
+                owes.push({ user: memberId, amount: splitAmount });
             }
         });
     } else if (splitType === 'percentage') {
@@ -57,9 +62,9 @@ const addGroupExpense = asyncHandler(async (req, res) => {
 
         customSplits.forEach(split => {
             if (split.user.toString() !== req.user.id) {
-                const owesAmount = (totalAmount * (Number(split.value) / 100)).toFixed(2);
-                if (Number(owesAmount) > 0) {
-                    owes.push({ user: split.user, amount: Number(owesAmount) });
+                const owesAmount = Math.floor((totalAmount * (Number(split.value) / 100)) * 100) / 100;
+                if (owesAmount > 0) {
+                    owes.push({ user: split.user, amount: owesAmount });
                 }
             }
         });
@@ -107,17 +112,20 @@ const addGroupExpense = asyncHandler(async (req, res) => {
 const getSplitSummary = asyncHandler(async (req, res) => {
     const groupId = req.params.groupId;
 
-    // Optional Check Membership
+    // Check Membership or System Admin
     const group = await Group.findById(groupId);
-    if (!group.members.includes(req.user.id)) {
+    const isMember = group.members.includes(req.user.id);
+    const isSystemAdmin = req.user.role === 'system_admin';
+
+    if (!isMember && !isSystemAdmin) {
         res.status(403);
-        throw new Error('Not authorized');
+        throw new Error('Not authorized to view group summaries');
     }
 
     const splits = await Split.find({ groupId })
         .populate('payer', 'name')
         .populate('owes.user', 'name')
-        .populate('expenseId', 'title amount date')
+        .populate('expenseId', 'title amount createdAt category')
         .sort({ createdAt: -1 });
 
     res.status(200).json(splits);
@@ -179,7 +187,7 @@ const getSettlements = asyncHandler(async (req, res) => {
             from: debtor.name,
             toId: creditor.userId,
             to: creditor.name,
-            amount: minAmount.toFixed(2),
+            amount: Number(minAmount.toFixed(2)),
             message: `${debtor.name} owes ${creditor.name} ₹${minAmount.toFixed(2)}`
         });
 
@@ -205,9 +213,14 @@ const settleDebt = asyncHandler(async (req, res) => {
         throw new Error('Group not found');
     }
 
-    if (!group.members.includes(req.user.id) || !group.members.includes(toUserId)) {
+    if ((!group.members.includes(req.user.id) || !group.members.includes(toUserId)) && req.user.role !== 'system_admin') {
         res.status(403);
         throw new Error('Both users must be part of the group');
+    }
+
+    if (req.user.role === 'system_admin') {
+        res.status(403);
+        throw new Error('System admins are restricted from settling debts.');
     }
 
     // Create a settlement transaction
@@ -222,10 +235,11 @@ const settleDebt = asyncHandler(async (req, res) => {
         description: 'Payment to settle an outstanding balance'
     });
 
-    // Create an inverse split to cancel the debt
-    // Payer is req.user.id, the person who made the payment.
-    // They are effectively paying 'toUserId'. In the split system, this means they paid the entire amount,
-    // and 'toUserId' consumed the entire amount, which zeroes the balance.
+    // Create an inverse split to cancel the debt.
+    // In the balance system: payer gets +amount, owes users get -amount.
+    // Original: B paid, A owes → B=+500, A=-500
+    // Settlement: A pays B → payer=A(+500), B in owes(-500)
+    // Net: A = -500+500 = 0, B = +500-500 = 0 ✓
     const split = await Split.create({
         expenseId: transaction._id,
         groupId,

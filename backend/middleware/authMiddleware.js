@@ -10,17 +10,20 @@ const protect = async (req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             req.user = await User.findById(decoded.id).select('-password');
             if (!req.user) {
-                return res.status(401).json({ message: 'User account not found or has been deleted. Please log in again.' });
+                res.status(401);
+                throw new Error('User account not found or has been deleted. Please log in again.');
             }
             next();
         } catch (error) {
-            console.error(error);
-            res.status(401).json({ message: 'Not authorized' });
+            console.error('Auth Middleware Error:', error.message);
+            res.status(401);
+            throw new Error('Not authorized, token failed');
         }
     }
 
     if (!token) {
-        res.status(401).json({ message: 'Not authorized, no token' });
+        res.status(401);
+        throw new Error('Not authorized, no token');
     }
 };
 

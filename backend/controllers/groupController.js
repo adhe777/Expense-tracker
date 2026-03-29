@@ -2,6 +2,8 @@ const asyncHandler = require('express-async-handler');
 const Group = require('../models/groupModel');
 const User = require('../models/userModel');
 const Notification = require('../models/notificationModel');
+const Transaction = require('../models/transactionModel');
+const Split = require('../models/splitModel');
 
 // @desc    Create a new group
 // @route   POST /api/group/create
@@ -14,17 +16,21 @@ const createGroup = asyncHandler(async (req, res) => {
         throw new Error('Group name is required');
     }
 
+    const isSystemAdmin = req.user.role === 'system_admin';
+
     const group = await Group.create({
         groupName,
         groupDescription,
         createdBy: req.user.id,
-        members: [req.user.id] // Creator is added as the first member
+        members: isSystemAdmin ? [] : [req.user.id] // System Admin is NOT added as a member
     });
 
-    // Add group to user's groups array
-    await User.findByIdAndUpdate(req.user.id, {
-        $push: { groups: group._id }
-    });
+    // Only add group to user's groups array if not system admin
+    if (!isSystemAdmin) {
+        await User.findByIdAndUpdate(req.user.id, {
+            $push: { groups: group._id }
+        });
+    }
 
     res.status(201).json(group);
 });
@@ -53,7 +59,12 @@ const inviteMember = asyncHandler(async (req, res) => {
         throw new Error('User not found with this email');
     }
 
-    if (group.members.includes(invitee._id)) {
+    if (invitee.role === 'system_admin') {
+        res.status(403);
+        throw new Error('System admins cannot be group members');
+    }
+
+    if (group.members.some(m => m.toString() === invitee._id.toString())) {
         res.status(400);
         throw new Error('User is already a member of this group');
     }
@@ -86,7 +97,8 @@ const inviteMember = asyncHandler(async (req, res) => {
 // @route   POST /api/group/remove
 // @access  Private
 const removeMember = asyncHandler(async (req, res) => {
-    const { groupId, memberId } = req.body;
+    const groupId = req.params.groupId || req.body.groupId;
+    const memberId = req.params.memberId || req.body.memberId;
 
     const group = await Group.findById(groupId);
     if (!group) {
@@ -94,9 +106,10 @@ const removeMember = asyncHandler(async (req, res) => {
         throw new Error('Group not found');
     }
 
-    if (group.createdBy.toString() !== req.user.id) {
+    // Only group admin or system admin can remove
+    if (group.createdBy.toString() !== req.user.id && req.user.role !== 'system_admin') {
         res.status(403);
-        throw new Error('Only the group admin can remove members');
+        throw new Error('Only the group admin or system admin can remove members');
     }
 
     if (group.createdBy.toString() === memberId) {
@@ -139,6 +152,11 @@ const deleteGroup = asyncHandler(async (req, res) => {
         { $pull: { groups: group._id } }
     );
 
+    // Cascade delete related records
+    await Transaction.deleteMany({ groupId: group._id });
+    await Split.deleteMany({ groupId: group._id });
+    await Notification.deleteMany({ relatedGroup: group._id });
+
     await group.deleteOne();
 
     res.status(200).json({ id: req.params.id, message: 'Group deleted successfully' });
@@ -148,21 +166,75 @@ const deleteGroup = asyncHandler(async (req, res) => {
 // @route   GET /api/group/:id
 // @access  Private
 const getGroupDetails = asyncHandler(async (req, res) => {
-    const group = await Group.findById(req.params.id).populate('members', 'name email').populate('createdBy', 'name email');
+    const group = await Group.findById(req.params.id)
+        .populate('members', 'name email avatar')
+        .populate('createdBy', 'name email avatar');
 
     if (!group) {
         res.status(404);
         throw new Error('Group not found');
     }
 
-    // Check if user is a member
+    // Check if user is a member or system admin
     const isMember = group.members.some(member => member._id.toString() === req.user.id);
-    if (!isMember) {
+    const isAdmin = req.user.role === 'system_admin';
+    
+    if (!isMember && !isAdmin) {
         res.status(403);
         throw new Error('Not authorized to view this group');
     }
 
+    // Filter out system admins from members list for regular users
+    if (req.user.role !== 'system_admin') {
+        group.members = group.members.filter(m => m.role !== 'system_admin');
+    }
+
     res.status(200).json(group);
+});
+
+// @desc    Transfer Group Admin ownership
+// @route   POST /api/group/transfer-admin
+// @access  Private/Group Admin or System Admin
+const transferGroupAdmin = asyncHandler(async (req, res) => {
+    const { groupId, newAdminId } = req.body;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+        res.status(404);
+        throw new Error('Group not found');
+    }
+
+    // Only current admin or system admin can transfer
+    if (group.createdBy.toString() !== req.user.id && req.user.role !== 'system_admin') {
+        res.status(403);
+        throw new Error('Only the group admin or system admin can transfer ownership');
+    }
+
+    const newAdmin = await User.findById(newAdminId);
+    if (!newAdmin) {
+        res.status(404);
+        throw new Error('New admin user not found');
+    }
+
+    if (newAdmin.role === 'system_admin') {
+        res.status(400);
+        throw new Error('Ownership cannot be transferred to a system admin');
+    }
+
+    group.createdBy = newAdminId;
+    
+    // Ensure new admin is in the members array if they aren't already
+    if (!group.members.some(m => m.toString() === newAdminId)) {
+        group.members.push(newAdminId);
+        // Also add group to new admin's groups array
+        await User.findByIdAndUpdate(newAdminId, {
+            $addToSet: { groups: group._id }
+        });
+    }
+
+    await group.save();
+
+    res.status(200).json({ message: 'Group ownership transferred successfully', newAdmin: newAdmin.name });
 });
 
 // @desc    Leave a group
@@ -221,7 +293,9 @@ const acceptInvite = asyncHandler(async (req, res) => {
         throw new Error('Group not found');
     }
 
-    if (!group.members.includes(req.user.id)) {
+    const userIdStr = req.user.id.toString();
+    const isAlreadyMember = group.members.some(m => m.toString() === userIdStr);
+    if (!isAlreadyMember) {
         group.members.push(req.user.id);
         await group.save();
 
@@ -253,6 +327,31 @@ const rejectInvite = asyncHandler(async (req, res) => {
     res.status(200).json({ message: 'Invite rejected' });
 });
 
+// @desc    Get group members
+// @route   GET /api/group/:groupId/members
+// @access  Private/Member
+const getGroupMembers = asyncHandler(async (req, res) => {
+    const group = await Group.findById(req.params.groupId).populate('members', 'name email avatar');
+    if (!group) {
+        res.status(404);
+        throw new Error('Group not found');
+    }
+    if (req.user.role !== 'system_admin') {
+        group.members = group.members.filter(m => m.role !== 'system_admin');
+    }
+    res.status(200).json(group.members);
+});
+
+// @desc    Get group expenses
+// @route   GET /api/group/:groupId/expenses
+// @access  Private/Member
+const getGroupExpenses = asyncHandler(async (req, res) => {
+    const expenses = await Transaction.find({ groupId: req.params.groupId, type: 'expense' })
+        .populate('user', 'name')
+        .sort({ date: -1 });
+    res.status(200).json(expenses);
+});
+
 module.exports = {
     createGroup,
     inviteMember,
@@ -262,5 +361,8 @@ module.exports = {
     leaveGroup,
     getNotifications,
     acceptInvite,
-    rejectInvite
+    rejectInvite,
+    getGroupMembers,
+    getGroupExpenses,
+    transferGroupAdmin
 };

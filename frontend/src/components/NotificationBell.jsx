@@ -55,40 +55,40 @@ const NotificationBell = ({ onUpdateGroups }) => {
         <div style={{ position: 'relative' }}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
+                className="hover-lift"
                 style={{
-                    background: 'var(--bg-card)',
+                    background: 'rgba(255,255,255,0.03)',
                     border: '1px solid var(--border)',
-                    borderRadius: '50%',
-                    width: '40px',
-                    height: '40px',
+                    borderRadius: '12px',
+                    width: '44px',
+                    height: '44px',
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
                     cursor: 'pointer',
                     position: 'relative',
-                    color: 'var(--text-secondary)',
-                    transition: 'all 0.2s ease',
+                    color: 'var(--text-primary)',
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                onMouseOut={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
             >
                 <Bell size={20} />
                 {notifications.length > 0 && (
                     <span style={{
                         position: 'absolute',
-                        top: '-2px',
-                        right: '-2px',
-                        background: 'var(--danger)',
+                        top: '-4px',
+                        right: '-4px',
+                        background: 'var(--warning)',
                         color: 'white',
                         fontSize: '0.65rem',
-                        fontWeight: 'bold',
-                        width: '18px',
-                        height: '18px',
+                        fontWeight: 900,
+                        width: '20px',
+                        height: '20px',
                         borderRadius: '50%',
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.4)'
+                        boxShadow: '0 0 15px var(--warning)',
+                        border: '2px solid var(--bg-sidebar)'
                     }}>
                         {notifications.length}
                     </span>
@@ -96,47 +96,53 @@ const NotificationBell = ({ onUpdateGroups }) => {
             </button>
 
             {isOpen && (
-                <div style={{
+                <div className="animate-fade-in" style={{
                     position: 'absolute',
-                    top: '50px',
+                    top: '60px',
                     right: 0,
-                    width: '320px',
-                    background: 'var(--glass)',
+                    width: '350px',
+                    background: 'var(--bg-card)',
                     backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '0.75rem',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                    padding: '1rem',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: '1.25rem',
+                    boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                    padding: '1.5rem',
                     zIndex: 1000,
                     color: 'var(--text-primary)'
                 }}>
-                    <h4 style={{ marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '0.9rem', fontWeight: 600 }}>Notifications</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, letterSpacing: '-0.01em' }}>Group Invites</h4>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{notifications.length} Pending</span>
+                    </div>
 
                     {loading ? (
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '1rem 0' }}>Loading...</p>
+                        <div style={{ textAlign: 'center', padding: '2rem' }}>
+                            <div className="neon-glow" style={{ width: '24px', height: '24px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }}></div>
+                        </div>
                     ) : notifications.length === 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1rem 0', color: 'var(--text-secondary)' }}>
-                            <Bell size={32} style={{ opacity: 0.2, marginBottom: '0.5rem' }} />
-                            <p style={{ fontSize: '0.85rem' }}>No new notifications</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
+                            <Bell size={40} style={{ opacity: 0.1, marginBottom: '1rem' }} />
+                            <p style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>All Systems Clear</p>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
                             {notifications.map(notification => (
-                                <div key={notification._id} style={{ background: 'var(--bg-main)', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-                                    <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                                        <strong>{notification.sender.name}</strong> invited you to join <strong style={{ color: 'var(--primary)' }}>{notification.relatedGroup.groupName}</strong>
+                                <div key={notification._id} style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '1rem', border: '1px solid var(--border)', transition: 'all 0.3s ease' }} className="hover-lift">
+                                    <p style={{ fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.5', fontWeight: 600 }}>
+                                        <strong style={{ color: 'var(--accent)' }}>{notification.sender.name.toUpperCase()}</strong> invited you to join <strong style={{ color: 'var(--primary)' }}>{notification.relatedGroup.groupName.toUpperCase()}</strong>
                                     </p>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
                                         <button
                                             onClick={() => handleAccept(notification._id)}
-                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', background: 'var(--success)', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '0.25rem', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                                            className="hover-lift"
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: 'var(--success)', color: 'white', border: 'none', padding: '0.6rem', borderRadius: '0.75rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0, 184, 148, 0.2)' }}
                                         >
                                             <Check size={14} /> Accept
                                         </button>
                                         <button
                                             onClick={() => handleReject(notification._id)}
-                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', padding: '0.4rem', borderRadius: '0.25rem', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                                            className="hover-lift"
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border)', padding: '0.6rem', borderRadius: '0.75rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                                         >
                                             <X size={14} /> Decline
                                         </button>

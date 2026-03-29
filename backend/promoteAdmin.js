@@ -1,25 +1,33 @@
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
 const User = require('./models/userModel');
+const dotenv = require('dotenv');
+const connectDB = require('./config/db');
 
 dotenv.config();
+connectDB();
 
-const promoteUser = async () => {
+const promote = async () => {
+    const email = process.argv[2];
+    if (!email) {
+        console.log('Please provide user email: node promoteAdmin.js exampleSettings@gmail.com');
+        process.exit(1);
+    }
+
     try {
-        await mongoose.connect(process.env.MONGO_URI);
-        const email = 'admin@gmail.com';
-        const user = await User.findOneAndUpdate({ email }, { role: 'admin' }, { new: true });
-
-        if (user) {
-            console.log(`User ${user.name} (${user.email}) promoted to Admin successfully!`);
-        } else {
-            console.log(`User with email ${email} not found.`);
+        const user = await User.findOne({ email });
+        if (!user) {
+            console.log('User not found');
+            process.exit(1);
         }
-        process.exit();
+
+        user.role = 'system_admin';
+        await user.save();
+        console.log(`User ${email} promoted to system_admin`);
+        process.exit(0);
     } catch (error) {
         console.error(error);
         process.exit(1);
     }
 };
 
-promoteUser();
+promote();

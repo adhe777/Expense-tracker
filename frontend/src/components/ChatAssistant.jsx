@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, MessageCircle, X } from 'lucide-react';
-import { chatService } from '../services/api';
+import { aiService } from '../services/api';
 
 const ChatAssistant = () => {
     const [messages, setMessages] = useState([
@@ -20,8 +20,12 @@ const ChatAssistant = () => {
     }, [messages]);
 
     const handleSend = async (e) => {
-        e.preventDefault();
-        if (!input.trim()) return;
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        if (!input.trim() || isLoading) return;
 
         const userMsg = input.trim();
         setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
@@ -29,9 +33,10 @@ const ChatAssistant = () => {
         setIsLoading(true);
 
         try {
-            const data = await chatService.sendMessage(userMsg);
+            const data = await aiService.processChat(userMsg);
             setMessages(prev => [...prev, { role: 'bot', text: data.reply }]);
         } catch (err) {
+            console.error("Chat Error:", err);
             setMessages(prev => [...prev, { role: 'bot', text: 'Sorry, I am having trouble connecting to the brain. Please try again later.' }]);
         } finally {
             setIsLoading(false);
@@ -42,28 +47,35 @@ const ChatAssistant = () => {
         return (
             <button
                 onClick={() => setIsOpen(true)}
+                className="animate-fade-in"
                 style={{
                     position: 'fixed',
                     bottom: '2rem',
                     right: '2rem',
-                    width: '60px',
-                    height: '60px',
+                    width: '64px',
+                    height: '64px',
                     borderRadius: '50%',
-                    background: 'var(--primary)',
+                    background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
                     color: 'white',
                     border: 'none',
-                    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.4)',
+                    boxShadow: '0 8px 20px rgba(99, 102, 241, 0.4)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1000,
-                    transition: 'transform 0.2s'
+                    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                 }}
-                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)';
+                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(99, 102, 241, 0.5)';
+                }}
+                onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(99, 102, 241, 0.4)';
+                }}
             >
-                <MessageCircle size={24} />
+                <MessageCircle size={28} />
             </button>
         );
     }
@@ -109,42 +121,59 @@ const ChatAssistant = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '1rem',
-                background: 'var(--bg-main)'
+                background: 'var(--bg-main)',
+                scrollBehavior: 'smooth'
             }}>
                 {messages.map((m, i) => (
-                    <div key={i} style={{
+                    <div key={i} className="animate-fade-in" style={{
                         alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                         maxWidth: '85%',
                         display: 'flex',
                         flexDirection: 'column',
-                        alignItems: m.role === 'user' ? 'flex-end' : 'flex-start'
+                        alignItems: m.role === 'user' ? 'flex-end' : 'flex-start',
+                        animationDelay: `${i * 0.05}s`
                     }}>
                         <div style={{
-                            padding: '0.75rem 1rem',
-                            borderRadius: '1rem',
-                            fontSize: '0.875rem',
-                            lineHeight: 1.5,
-                            background: m.role === 'user' ? 'var(--primary)' : 'var(--bg-card)',
+                            padding: '0.875rem 1.125rem',
+                            borderRadius: '1.25rem',
+                            fontSize: '0.9rem',
+                            lineHeight: 1.6,
+                            background: m.role === 'user' ? 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)' : 'var(--bg-card)',
                             color: m.role === 'user' ? 'white' : 'var(--text-primary)',
-                            boxShadow: m.role === 'user' ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
+                            boxShadow: m.role === 'user' ? '0 4px 12px rgba(99, 102, 241, 0.2)' : '0 1px 3px rgba(0,0,0,0.05)',
                             border: m.role === 'user' ? 'none' : '1px solid var(--border)',
-                            borderBottomRightRadius: m.role === 'user' ? '0.25rem' : '1rem',
-                            borderBottomLeftRadius: m.role === 'user' ? '1rem' : '0.25rem'
+                            borderBottomRightRadius: m.role === 'user' ? '0.25rem' : '1.25rem',
+                            borderBottomLeftRadius: m.role === 'user' ? '1.25rem' : '0.25rem'
                         }}>
                             {m.text}
                         </div>
                     </div>
                 ))}
                 {isLoading && (
-                    <div style={{ alignSelf: 'flex-start', background: 'var(--bg-card)', color: 'var(--text-primary)', padding: '0.75rem 1rem', borderRadius: '1rem', border: '1px solid var(--border)', fontSize: '0.875rem' }}>
-                        Thinking...
+                    <div className="animate-fade-in" style={{ alignSelf: 'flex-start', background: 'var(--bg-card)', color: 'var(--text-primary)', padding: '0.875rem 1.125rem', borderRadius: '1.25rem', border: '1px solid var(--border)', fontSize: '0.9rem', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <span style={{ fontStyle: 'italic', opacity: 0.8 }}>Thinking</span>
+                        <style>
+                            {`
+                                @keyframes pulse-dots {
+                                    0% { opacity: 0.3; transform: scale(0.8); }
+                                    50% { opacity: 1; transform: scale(1.1); }
+                                    100% { opacity: 0.3; transform: scale(0.8); }
+                                }
+                                .dot { width: 4px; height: 4px; background: var(--primary); border-radius: 50%; display: inline-block; animation: pulse-dots 1s infinite; }
+                                .dot:nth-child(2) { animation-delay: 0.2s; }
+                                .dot:nth-child(3) { animation-delay: 0.4s; }
+                            `}
+                        </style>
+                        <span className="dot"></span>
+                        <span className="dot"></span>
+                        <span className="dot"></span>
                     </div>
                 )}
                 <div ref={messagesEndRef} />
             </div>
 
             {/* Input */}
-            <form onSubmit={handleSend} style={{
+            <div style={{
                 padding: '1rem',
                 background: 'var(--bg-card)',
                 borderTop: '1px solid var(--border)',
@@ -155,6 +184,13 @@ const ChatAssistant = () => {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSend();
+                        }
+                    }}
                     placeholder="Ask about spending, income..."
                     style={{
                         flex: 1,
@@ -168,7 +204,8 @@ const ChatAssistant = () => {
                     }}
                 />
                 <button
-                    type="submit"
+                    type="button"
+                    onClick={() => handleSend()}
                     style={{
                         width: '38px',
                         height: '38px',
@@ -184,7 +221,7 @@ const ChatAssistant = () => {
                 >
                     <Send size={18} />
                 </button>
-            </form>
+            </div>
         </div>
     );
 };

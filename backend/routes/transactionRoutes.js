@@ -7,10 +7,19 @@ const {
     getStats
 } = require('../controllers/transactionController');
 const { protect } = require('../middleware/authMiddleware');
+const restrictSystemAdmin = (req, res, next) => {
+    if (req.user && req.user.role === 'system_admin') {
+        return res.status(403).json({ message: 'System admins cannot access personal finances.' });
+    }
+    next();
+};
 
-router.get('/', protect, getTransactions);
-router.post('/', protect, addTransaction);
-router.delete('/:id', protect, deleteTransaction);
-router.get('/stats', protect, getStats);
+router.use(protect);
+router.use(restrictSystemAdmin);
+
+router.get('/', getTransactions);
+router.post('/', addTransaction);
+router.delete('/:id', deleteTransaction);
+router.get('/stats', getStats);
 
 module.exports = router;

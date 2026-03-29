@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { groupService } from '../services/api';
 import NotificationBell from '../components/NotificationBell';
-import { ArrowLeft, Users, IndianRupee, PlusCircle, UserPlus, List, Trash2, ShieldAlert, Mail, FileText, Tag, Hexagon, Send, Crown, UserMinus } from 'lucide-react';
+import ConfirmModal from '../components/ConfirmModal';
+import { ArrowLeft, ArrowRight, Users, IndianRupee, PlusCircle, UserPlus, List, Trash2, ShieldAlert, Mail, FileText, Tag, Hexagon, Send, Crown, UserMinus } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Menu } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
 
 const GroupDashboard = ({ groupId, onBack }) => {
-    const { user } = useAuth();
+    const { user, isSystemAdmin } = useAuth();
     const [group, setGroup] = useState(null);
     const [splits, setSplits] = useState([]);
     const [settlements, setSettlements] = useState([]);
@@ -15,6 +18,18 @@ const GroupDashboard = ({ groupId, onBack }) => {
     const [showInvite, setShowInvite] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
     const [showAddExpense, setShowAddExpense] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // Confirm Modal State
+    const [confirmModal, setConfirmModal] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        confirmText: 'Confirm',
+        variant: 'danger',
+        onConfirm: () => { }
+    });
 
     // Expense Form State
     const [expenseForm, setExpenseForm] = useState({
@@ -53,58 +68,99 @@ const GroupDashboard = ({ groupId, onBack }) => {
         }
     }, [group]);
 
-    const handleLeaveGroup = async () => {
-        if (window.confirm('Are you sure you want to leave this group?')) {
-            try {
-                await groupService.leaveGroup(groupId);
-                toast.success('Successfully left the group');
-                onBack(); // navigate away
-            } catch (error) {
-                toast.error(error.response?.data?.message || 'Failed to leave group');
+    const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+    const handleLeaveGroup = () => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Leave Group',
+            message: 'Are you sure you want to leave this group? You will lose access to all shared expenses and settlements.',
+            confirmText: 'Leave Group',
+            variant: 'danger',
+            onConfirm: async () => {
+                closeConfirmModal();
+                try {
+                    setIsSubmitting(true);
+                    await groupService.leaveGroup(groupId);
+                    toast.success('Successfully left the group');
+                    onBack();
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to leave group');
+                } finally {
+                    setIsSubmitting(false);
+                }
             }
-        }
+        });
     };
 
-    const handleRemoveMember = async (memberId) => {
-        if (window.confirm('Are you sure you want to remove this member?')) {
-            try {
-                await groupService.removeMember({ groupId, memberId });
-                toast.success('Member removed');
-                fetchData();
-            } catch (error) {
-                toast.error(error.response?.data?.message || 'Failed to remove member');
+    const handleRemoveMember = (memberId, memberName) => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Remove Member',
+            message: `Are you sure you want to remove ${memberName} from this group? They will lose access to all shared data.`,
+            confirmText: 'Remove',
+            variant: 'danger',
+            onConfirm: async () => {
+                closeConfirmModal();
+                try {
+                    setIsSubmitting(true);
+                    await groupService.removeMember(groupId, memberId);
+                    toast.success('Member removed');
+                    fetchData();
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to remove member');
+                } finally {
+                    setIsSubmitting(false);
+                }
             }
-        }
+        });
     };
 
-    const handleSettle = async (toUserId, amount) => {
-        if (window.confirm(`Confirm payment of ₹${amount}?`)) {
-            try {
-                await groupService.settleDebt({ groupId, toUserId, amount: Number(amount) });
-                toast.success('Payment recorded successfully!');
-                fetchData();
-            } catch (error) {
-                toast.error(error.response?.data?.message || 'Failed to settle debt');
+    const handleSettle = (toUserId, amount, toUserName) => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Confirm Payment',
+            message: `You are about to record a payment of ₹${amount} to ${toUserName}. This action will settle the outstanding balance.`,
+            confirmText: `Pay ₹${amount}`,
+            variant: 'success',
+            onConfirm: async () => {
+                closeConfirmModal();
+                try {
+                    setIsSubmitting(true);
+                    await groupService.settleDebt({ groupId, toUserId, amount: Number(amount) });
+                    toast.success('Payment recorded successfully!');
+                    fetchData();
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to settle debt');
+                } finally {
+                    setIsSubmitting(false);
+                }
             }
-        }
+        });
     };
 
     const handleInvite = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
         try {
+            setIsSubmitting(true);
             await groupService.inviteMember({ groupId, email: inviteEmail });
             setInviteEmail('');
             setShowInvite(false);
             fetchData();
-            alert('User invited successfully!');
+            toast.success('User invited successfully!');
         } catch (error) {
-            alert(error.response?.data?.message || 'Failed to invite user');
+            toast.error(error.response?.data?.message || 'Failed to invite user');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleAddExpense = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
         try {
+            setIsSubmitting(true);
             await groupService.addGroupExpense({
                 groupId,
                 ...expenseForm
@@ -112,8 +168,11 @@ const GroupDashboard = ({ groupId, onBack }) => {
             setShowAddExpense(false);
             setExpenseForm(prev => ({ ...prev, title: '', amount: '', splitType: 'equal' }));
             fetchData();
+            toast.success('Group expense added!');
         } catch (error) {
-            alert(error.response?.data?.message || 'Failed to add group expense');
+            toast.error(error.response?.data?.message || 'Failed to add group expense');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -126,82 +185,120 @@ const GroupDashboard = ({ groupId, onBack }) => {
         }));
     };
 
-    if (!group) return <div style={{ padding: '2rem', color: 'white' }}>Loading Resource...</div>;
+    const handleTransferAdmin = (newAdminId, newAdminName) => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Transfer Group Leadership',
+            message: `Are you sure you want to make ${newAdminName} the group admin? You will still be a member but will lose administrative privileges.`,
+            confirmText: 'Transfer Leadership',
+            variant: 'warning',
+            onConfirm: async () => {
+                closeConfirmModal();
+                try {
+                    setIsSubmitting(true);
+                    await groupService.transferAdmin({ groupId, newAdminId });
+                    toast.success(`Leadership transferred to ${newAdminName}`);
+                    fetchData();
+                } catch (error) {
+                    toast.error(error.response?.data?.message || 'Failed to transfer leadership');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            }
+        });
+    };
 
-    const isAdmin = group.createdBy._id === user._id;
+    if (!group) return <div style={{ padding: '2rem', color: 'var(--text-primary)' }}>Loading Group...</div>;
+
+    const isGroupAdmin = group.createdBy._id === user._id || group.createdBy === user._id;
+    const canManageGroup = isGroupAdmin || isSystemAdmin;
 
     return (
-        <div style={{ height: '100vh', overflowY: 'auto', padding: '2rem 3rem', background: 'transparent' }}>
-            {/* Header */}
-            <div className="dashboard-container" style={{ padding: '0', background: 'var(--bg-main)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-                <header style={{ padding: '1.5rem 3rem', background: 'var(--glass)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div className="app-layout">
+            <button className="sidebar-toggle" onClick={() => setIsSidebarOpen(true)}>
+                <Menu size={24} />
+            </button>
+
+            <Sidebar 
+                onShowCreateGroup={() => {}} // Not needed here as it's on main dashboard
+                isOpen={isSidebarOpen} 
+                onClose={() => setIsSidebarOpen(false)} 
+            />
+
+            <main className="main-content">
+                <header style={{ marginBottom: '3.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }} onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-primary)'; }}>
+                        <button onClick={onBack} className="btn-icon" title="Go Back">
                             <ArrowLeft size={20} />
                         </button>
                         <div>
-                            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                {group.groupName}
-                            </h1>
-                            {group.groupDescription && <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>{group.groupDescription}</p>}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent)', marginBottom: '0.5rem', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                                <Users size={14} />
+                                <span>Collaborative Hub</span>
+                            </div>
+                            <h1 style={{ fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.04em' }}>{group.groupName}</h1>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <NotificationBell onUpdateGroups={(newGroup) => {
-                            const updatedUser = { ...user, groups: [...(user.groups || []), newGroup] };
-                            sessionStorage.setItem('user', JSON.stringify(updatedUser));
-                            window.location.reload();
-                        }} />
-                        <button className="btn-modern-submit" onClick={() => setShowInvite(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem' }}>
-                            <Users size={18} /> Invite Member
-                        </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                        <NotificationBell onUpdateGroups={() => fetchData()} />
+                        {canManageGroup && (
+                            <button className="btn btn-primary" onClick={() => setShowInvite(true)}>
+                                <UserPlus size={18} /> 
+                                <span>Invite</span>
+                            </button>
+                        )}
                     </div>
                 </header>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '2rem' }}>
-
-                    {/* Main Column */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-
-                        {/* Settlements Summary */}
-                        <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><IndianRupee size={20} color="var(--primary)" /> Net Settlements</h3>
-                                <button className="btn-modern-submit" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} onClick={() => setShowAddExpense(true)}>
-                                    <PlusCircle size={16} /> Add Group Expense
-                                </button>
+                        {/* Summary Card */}
+                        <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <ShieldAlert size={24} color="var(--primary)" />
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 900 }}>Outstanding Balances</h3>
+                                </div>
+                                {!isSystemAdmin && (
+                                    <button className="btn btn-primary" onClick={() => setShowAddExpense(true)}>
+                                        <PlusCircle size={18} /> <span>Add Group Expense</span>
+                                    </button>
+                                )}
                             </div>
 
                             {settlements.length === 0 ? (
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>All settled up! No outstanding balances.</p>
+                                <div style={{ textAlign: 'center', padding: '2rem', background: 'rgba(0,0,0,0.01)', borderRadius: '1rem', border: '1px dashed var(--border)' }}>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 600 }}>All debts are settled. No pending payments.</p>
+                                </div>
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     {settlements.map((s, idx) => (
-                                        <div key={idx} style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontWeight: 600 }}>{s.from} <ArrowLeft size={14} style={{ display: 'inline', margin: '0 0.25rem', color: 'var(--text-secondary)' }} /> {s.to}</span>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                <span style={{ fontWeight: 700, color: 'var(--warning)' }}>₹{s.amount}</span>
-                                                {s.fromId === user._id && (
+                                        <div key={idx} className="hover-lift" style={{ 
+                                            padding: '1.25rem 1.5rem', 
+                                            background: 'rgba(0, 0, 0, 0.2)', 
+                                            borderRadius: '1rem', 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'center',
+                                            border: '1px solid var(--border)'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--warning)', boxShadow: '0 0 10px var(--warning)' }}></div>
+                                                <span style={{ fontWeight: 700, fontSize: '1rem' }}>{s.from} <ArrowRight size={14} style={{ display: 'inline', margin: '0 0.5rem', color: 'var(--accent)' }} /> {s.to}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Amount</p>
+                                                    <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--warning)' }}>₹{s.amount.toLocaleString()}</span>
+                                                </div>
+                                                {s.fromId === user._id && !isSystemAdmin && (
                                                     <button
-                                                        onClick={() => handleSettle(s.toId, s.amount)}
-                                                        style={{
-                                                            background: 'linear-gradient(135deg, var(--success), #059669)',
-                                                            color: 'white',
-                                                            border: 'none',
-                                                            padding: '0.4rem 0.85rem',
-                                                            borderRadius: '0.375rem',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 600,
-                                                            cursor: 'pointer',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '0.3rem',
-                                                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-                                                            transition: 'all 0.2s ease'
-                                                        }}
-                                                        onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.5)'; }}
-                                                        onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)'; }}
+                                                        onClick={() => handleSettle(s.toId, s.amount, s.to)}
+                                                        disabled={isSubmitting}
+                                                        className="btn btn-success"
+                                                        style={{ height: '2.5rem', padding: '0 1rem', fontSize: '0.8rem' }}
                                                     >
-                                                        <IndianRupee size={14} /> Pay
+                                                        <Send size={14} /> Settle
                                                     </button>
                                                 )}
                                             </div>
@@ -211,40 +308,73 @@ const GroupDashboard = ({ groupId, onBack }) => {
                             )}
                         </div>
 
-                        {/* Shared History Ledger */}
-                        <section className="card" style={{ padding: '2rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><List size={20} color="var(--primary)" /> Shared History</h3>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.05em' }}>ALL TRANSACTIONS</div>
+                        {/* Recent Activity */}
+                        <section className="card" style={{ padding: '2.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <List size={24} color="var(--primary)" />
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.03em' }}>Recent Activity</h3>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Group Expense History</div>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {splits.length === 0 ? (
-                                    <div className="empty-state">
-                                        <FileText size={48} style={{ color: 'var(--border)', marginBottom: '1rem' }} />
-                                        <p style={{ fontWeight: 600 }}>No group expenses recorded yet.</p>
-                                        <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Click 'Add Group Expense' to post the first bill.</p>
+                                    <div className="empty-state" style={{ padding: '4rem 2rem' }}>
+                                        <FileText size={64} style={{ color: 'var(--border)', marginBottom: '1.5rem', opacity: 0.5 }} />
+                                        <p style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-secondary)' }}>No activity yet</p>
+                                        <p style={{ fontSize: '0.9rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>No group expenses have been added yet.</p>
                                     </div>
                                 ) : (
-                                    splits.map((split) => (
-                                        <div key={split._id} className="ledger-row" style={{ borderLeft: split.payer._id === user._id ? '4px solid var(--success)' : '4px solid var(--warning)' }}>
-                                            <div className={`ledger - icon ${split.payer._id === user._id ? 'ledger-income' : 'ledger-expense'} `}>
-                                                <FileText size={20} />
+                                    splits.map((split) => {
+                                        const payerInfo = group.members.find(m => m._id === (split.payer._id || split.payer));
+                                        return (
+                                            <div key={split._id} className="ledger-row" style={{ 
+                                                borderLeft: split.payer._id === user._id ? '4px solid var(--success)' : '4px solid var(--warning)',
+                                                background: 'var(--bg-main)',
+                                                padding: '1.25rem',
+                                                borderRadius: '1rem',
+                                                marginBottom: '1rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '1rem'
+                                            }}>
+                                                <div style={{ width: '48px', height: '48px', borderRadius: '14px', overflow: 'hidden', background: 'var(--bg-main)', border: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {payerInfo?.avatar ? (
+                                                        <img src={payerInfo.avatar} alt={payerInfo.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)', color: 'white', fontWeight: 900, fontSize: '1.1rem' }}>
+                                                            {payerInfo?.name?.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div style={{ flex: 1, marginLeft: '0.5rem' }}>
+                                                    <p style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{split.expenseId.title}</p>
+                                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem', fontWeight: 600 }}>
+                                                        Paid by <span style={{ color: 'var(--text-primary)', fontWeight: 800 }}>{split.payer._id === user._id ? 'YOU' : split.payer.name.toUpperCase()}</span> • {new Date(split.expenseId.createdAt).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                                                    <div className={split.payer._id === user._id ? 'amount-positive' : 'amount-negative'} style={{ fontWeight: 900, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>
+                                                        ₹{Number(split.expenseId?.amount || 0).toLocaleString()}
+                                                    </div>
+                                                    <div style={{
+                                                        padding: '0.35rem 0.75rem',
+                                                        borderRadius: '0.5rem',
+                                                        background: 'rgba(108, 92, 231, 0.1)',
+                                                        color: 'var(--primary-light)',
+                                                        fontSize: '0.65rem',
+                                                        fontWeight: 900,
+                                                        letterSpacing: '0.05em',
+                                                        textTransform: 'uppercase',
+                                                        border: '1px solid rgba(108, 92, 231, 0.2)'
+                                                    }}>
+                                                        {split.expenseId.category}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{split.expenseId.title}</p>
-                                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem', fontWeight: 500 }}>
-                                                    Paid by <span style={{ color: 'var(--text-primary)' }}>{split.payer._id === user._id ? 'You' : split.payer.name}</span> • {new Date(split.createdAt).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                            <div className={split.payer._id === user._id ? 'amount-positive' : 'amount-negative'}>
-                                                ₹{split.expenseId.amount.toLocaleString()}
-                                            </div>
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                                                {split.expenseId.category}
-                                            </div>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
                         </section>
@@ -252,177 +382,239 @@ const GroupDashboard = ({ groupId, onBack }) => {
 
                     {/* Sidebar Column */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                        <div className="card">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Users size={18} /> Directory</h3>
-                                {isAdmin && (
-                                    <button onClick={() => setShowInvite(true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
-                                        <UserPlus size={16} /> Invite
-                                    </button>
-                                )}
+                        <div className="card animate-fade-in" style={{ padding: '2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Users size={18} color="var(--primary)" />
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Group Members</h3>
+                                </div>
+                                <div style={{ background: 'rgba(108, 92, 231, 0.1)', padding: '0.25rem 0.75rem', borderRadius: '2rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)' }}>
+                                    {group.members.length} ACTIVE
+                                </div>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {group.members.map((member) => (
-                                    <div key={member._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                                                {member.name.charAt(0).toUpperCase()}
+                                    <div key={member._id} className="hover-lift" style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'space-between', 
+                                        padding: '1rem', 
+                                        background: 'rgba(255,255,255,0.02)', 
+                                        borderRadius: '1rem',
+                                        border: '1px solid transparent',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'rgba(108, 92, 231, 0.2)'}
+                                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'transparent'}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <div style={{ width: '44px', height: '44px', borderRadius: '12px', overflow: 'hidden', border: '2px solid var(--border)', background: 'var(--bg-main)', position: 'relative' }}>
+                                                {member.avatar ? (
+                                                    <img src={member.avatar} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-sidebar)', color: 'var(--accent)', fontWeight: 900, fontSize: '1rem' }}>
+                                                        {member.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                {member._id === group.createdBy._id && (
+                                                    <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', background: 'var(--warning)', borderRadius: '50%', color: 'white', padding: '2px', border: '2px solid var(--bg-card)' }}>
+                                                        <Crown size={8} style={{ fill: 'currentColor' }} />
+                                                    </div>
+                                                )}
                                             </div>
                                             <div>
-                                                <p style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                    {member.name} {member._id === user._id && <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(You)</span>}
+                                                <p style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                                                    {member.name.toUpperCase()}
                                                 </p>
-                                                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                    {member._id === group.createdBy._id ? <><Crown size={12} color="var(--warning)" /> Admin</> : 'Member'}
+                                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '0.1rem' }}>
+                                                    {member._id === group.createdBy._id ? 'Admin' : 'Member'}
+                                                    {member._id === user._id && <span style={{ color: 'var(--primary)', marginLeft: '0.5rem' }}>(YOU)</span>}
                                                 </p>
                                             </div>
                                         </div>
-                                        {isAdmin && member._id !== group.createdBy._id && (
-                                            <button
-                                                onClick={() => handleRemoveMember(member._id)}
-                                                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0.25rem', transition: 'all 0.2s', opacity: 0.7 }}
-                                                onMouseOver={(e) => e.currentTarget.style.opacity = 1}
-                                                onMouseOut={(e) => e.currentTarget.style.opacity = 0.7}
-                                                title="Remove Member"
-                                            >
-                                                <UserMinus size={16} />
-                                            </button>
-                                        )}
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            {canManageGroup && member._id !== group.createdBy._id && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleTransferAdmin(member._id, member.name)}
+                                                        disabled={isSubmitting}
+                                                        className="hover-lift"
+                                                        style={{ background: 'rgba(253, 203, 110, 0.1)', border: '1px solid rgba(253, 203, 110, 0.2)', color: 'var(--warning)', cursor: isSubmitting ? 'not-allowed' : 'pointer', padding: '0.5rem', borderRadius: '0.75rem', transition: 'all 0.3s ease', opacity: isSubmitting ? 0.4 : 1 }}
+                                                        title="Make Group Admin"
+                                                    >
+                                                        <Crown size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRemoveMember(member._id, member.name)}
+                                                        disabled={isSubmitting}
+                                                        className="hover-lift"
+                                                        style={{ background: 'rgba(214, 48, 49, 0.05)', border: '1px solid rgba(214, 48, 49, 0.1)', color: '#D63031', cursor: isSubmitting ? 'not-allowed' : 'pointer', padding: '0.5rem', borderRadius: '0.75rem', transition: 'all 0.3s ease', opacity: isSubmitting ? 0.4 : 1 }}
+                                                        title="Revoke Access"
+                                                    >
+                                                        <UserMinus size={16} />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
                 </div>
+            </main>
 
-                {/* Invite Modal */}
-                {showInvite && (
-                    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-                        <div className="card" style={{ width: '400px', padding: '2rem' }}>
-                            <h3 style={{ marginBottom: '1.5rem' }}>Invite Member</h3>
-                            <form onSubmit={handleInvite}>
-                                <div className="modern-input-group" style={{ marginBottom: '1.5rem' }}>
-                                    <label>User Email Address</label>
-                                    <div className="icon-input-wrapper">
-                                        <Mail className="input-icon" size={18} />
-                                        <input
-                                            type="email"
-                                            placeholder="friend@example.com"
-                                            value={inviteEmail}
-                                            onChange={(e) => setInviteEmail(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '1rem' }}>
-                                    <button type="submit" className="btn-modern-submit" style={{ flex: 1, margin: 0 }}>Send Invite</button>
-                                    <button type="button" onClick={() => setShowInvite(false)} className="btn-secondary" style={{ flex: 1 }}>Cancel</button>
-                                </div>
-                            </form>
+            {showInvite && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ width: '450px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
+                            <UserPlus size={24} color="var(--primary)" />
+                            <h3 style={{ fontSize: '1.5rem', fontWeight: 900 }}>Invite Member</h3>
                         </div>
+                        <form onSubmit={handleInvite}>
+                            <div className="modern-input-group" style={{ marginBottom: '2rem' }}>
+                                <label>Email Address</label>
+                                <div className="icon-input-wrapper">
+                                    <Mail className="input-icon" size={18} color="var(--primary)" />
+                                    <input
+                                        type="email"
+                                        placeholder="email@example.com"
+                                        value={inviteEmail}
+                                        onChange={(e) => setInviteEmail(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmitting}>
+                                    {isSubmitting ? 'Sending...' : 'Invite'}
+                                </button>
+                                <button type="button" onClick={() => setShowInvite(false)} className="btn" style={{ flex: 1 }}>Cancel</button>
+                            </div>
+                        </form>
                     </div>
-                )}
+                </div>
+            )}
 
-                {/* Add Group Expense Modal */}
-                {showAddExpense && (
-                    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '5vh', zIndex: 1000 }}>
-                        <div className="card" style={{ width: '500px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
-                            <h3 style={{ marginBottom: '1.5rem' }}>Add Group Expense</h3>
-                            <form onSubmit={handleAddExpense}>
-                                <div className="modern-input-group" style={{ marginBottom: '1rem' }}>
-                                    <label>Expense Title</label>
+            {/* Add Group Expense Modal */}
+            {showAddExpense && (
+                <div className="modal-overlay animate-fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '10vh', zIndex: 1000 }}>
+                    <div className="card animate-slide-up" style={{ width: '550px', padding: '2.5rem', maxHeight: '85vh', overflowY: 'auto', border: '1px solid var(--glass-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
+                            <PlusCircle size={24} color="var(--primary)" />
+                            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>Add Group Expense</h3>
+                        </div>
+                        <form onSubmit={handleAddExpense}>
+                            <div className="modern-input-group" style={{ marginBottom: '1.5rem' }}>
+                                <label>Description</label>
+                                <div className="icon-input-wrapper">
+                                    <FileText className="input-icon" size={18} color="var(--primary)" />
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Infrastructure Maintenance"
+                                        value={expenseForm.title}
+                                        onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                                <div className="modern-input-group">
+                                    <label>Amount (₹)</label>
                                     <div className="icon-input-wrapper">
-                                        <FileText className="input-icon" size={18} />
+                                        <IndianRupee className="input-icon" size={18} color="var(--primary)" />
                                         <input
-                                            type="text"
-                                            placeholder="Dinner at Goa"
-                                            value={expenseForm.title}
-                                            onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })}
+                                            type="number"
+                                            placeholder="0.00"
+                                            value={expenseForm.amount}
+                                            onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
                                             required
                                         />
                                     </div>
                                 </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                                    <div className="modern-input-group">
-                                        <label>Amount Paid (₹)</label>
-                                        <div className="icon-input-wrapper">
-                                            <IndianRupee className="input-icon" size={18} />
-                                            <input
-                                                type="number"
-                                                placeholder="0.00"
-                                                value={expenseForm.amount}
-                                                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="modern-input-group">
-                                        <label>Category</label>
-                                        <div className="icon-input-wrapper">
-                                            <Tag className="input-icon" size={18} />
-                                            <select
-                                                value={expenseForm.category}
-                                                onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                                                required
-                                            >
-                                                <option value="Food">Food</option>
-                                                <option value="Transport">Transport</option>
-                                                <option value="Stay">Stay</option>
-                                                <option value="Activities">Activities</option>
-                                                <option value="Misc">Misc</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="modern-input-group" style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--bg-card)', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-                                    <label style={{ color: 'var(--primary)', marginBottom: '0.5rem', display: 'block' }}>Split Logic</label>
-
-                                    <div className="icon-input-wrapper" style={{ marginBottom: '1rem' }}>
-                                        <Users className="input-icon" size={18} />
+                                <div className="modern-input-group">
+                                    <label>Category</label>
+                                    <div className="icon-input-wrapper">
+                                        <Tag className="input-icon" size={18} color="var(--primary)" />
                                         <select
-                                            value={expenseForm.splitType}
-                                            onChange={(e) => setExpenseForm({ ...expenseForm, splitType: e.target.value })}
+                                            className="form-input"
+                                            value={expenseForm.category}
+                                            onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                                            required
                                         >
-                                            <option value="equal">Split Equally</option>
-                                            <option value="percentage">Split by Percentage</option>
-                                            <option value="custom">Exact Custom Amounts</option>
+                                            <option value="Food" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Food & Dining</option>
+                                            <option value="Transport" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Transport</option>
+                                            <option value="Salary" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Income</option>
+                                            <option value="Stay" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Accommodation</option>
+                                            <option value="Activities" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Activities</option>
+                                            <option value="Misc" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Other</option>
                                         </select>
                                     </div>
+                                </div>
+                            </div>
 
-                                    {expenseForm.splitType !== 'equal' && (
-                                        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                                                {expenseForm.splitType === 'percentage' ? "Enter percentage (must total 100)" : "Enter exact amounts (must equal total)"}
-                                            </p>
-                                            {group.members.map(member => (
-                                                <div key={member._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                    <span style={{ fontSize: '0.9rem' }}>{member.name}</span>
+                            <div className="modern-input-group" style={{ marginBottom: '2.5rem', padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '1rem', border: '1px solid var(--border)' }}>
+                                <label style={{ color: 'var(--accent)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                                    <ShieldAlert size={14} /> Split Method
+                                </label>
+
+                                <div className="icon-input-wrapper" style={{ marginBottom: '1.5rem' }}>
+                                    <Users className="input-icon" size={18} color="var(--primary)" />
+                                    <select
+                                        className="form-input"
+                                        value={expenseForm.splitType}
+                                        onChange={(e) => setExpenseForm({ ...expenseForm, splitType: e.target.value })}
+                                    >
+                                        <option value="equal" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>Split Equally</option>
+                                        <option value="percentage" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>By Percentage</option>
+                                        <option value="custom" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>By Exact Amount</option>
+                                    </select>
+                                </div>
+
+                                {expenseForm.splitType !== 'equal' && (
+                                    <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                        {group.members.map(member => (
+                                            <div key={member._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0' }}>
+                                                <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>{member.name.toUpperCase()}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                     <input
                                                         type="number"
-                                                        style={{ width: '80px', padding: '0.35rem', borderRadius: '0.25rem', background: 'var(--bg-main)', border: '1px solid var(--border)', color: 'white', textAlign: 'right' }}
+                                                        style={{ width: '100px', padding: '0.5rem', borderRadius: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'white' }}
                                                         value={expenseForm.customSplits.find(cs => cs.user === member._id)?.value || ''}
                                                         onChange={(e) => handleCustomSplitChange(member._id, e.target.value)}
                                                     />
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{expenseForm.splitType === 'percentage' ? '%' : '₹'}</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
-                                <div style={{ display: 'flex', gap: '1rem' }}>
-                                    <button type="submit" className="btn-modern-submit" style={{ flex: 1 }}>Submit Expense</button>
-                                    <button type="button" onClick={() => setShowAddExpense(false)} className="btn-secondary" style={{ flex: 1 }}>Cancel</button>
-                                </div>
-                            </form>
-                        </div>
+                            <div style={{ display: 'flex', gap: '1.25rem' }}>
+                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmitting}>
+                                    {isSubmitting ? 'Saving...' : 'Add Expense'}
+                                </button>
+                                <button type="button" onClick={() => setShowAddExpense(false)} className="btn" style={{ flex: 1 }}>Cancel</button>
+                            </div>
+                        </form>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
+
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                confirmText={confirmModal.confirmText}
+                variant={confirmModal.variant}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={closeConfirmModal}
+            />
         </div>
-    );
+);
 };
+
 
 export default GroupDashboard;

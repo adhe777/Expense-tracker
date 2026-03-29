@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { aiService } from '../services/api';
 import { Sparkles, TrendingUp, TrendingDown, AlertCircle, BrainCircuit } from 'lucide-react';
 
 const AIForecast = () => {
@@ -9,8 +9,8 @@ const AIForecast = () => {
     useEffect(() => {
         const fetchPrediction = async () => {
             try {
-                const res = await axios.get('http://localhost:8081/api/ai/predict');
-                setData(res.data);
+                const res = await aiService.getPredictSpending();
+                setData(res);
                 setLoading(false);
             } catch (err) {
                 console.error(err);
@@ -20,61 +20,70 @@ const AIForecast = () => {
         fetchPrediction();
     }, []);
 
-    if (loading) return <div className="card" style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#64748b' }}>
-        <BrainCircuit className="spin-slow" style={{ marginRight: '10px' }} /> Analyzing spending patterns...
+    if (loading) return <div className="card" style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)', color: 'var(--text-secondary)' }}>
+        <BrainCircuit size={24} className="spin-slow" style={{ marginRight: '10px' }} /> Analyzing your spending...
     </div>;
     if (!data || data.prediction === 0) {
         return (
-            <div className="card" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px dashed #cbd5e1' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                    <BrainCircuit size={20} color="#64748b" />
-                    <h3 style={{ margin: 0, fontSize: '1rem', color: '#334155' }}>AI Insights</h3>
+            <div className="card" style={{ background: 'var(--bg-card)', border: '1px dashed var(--border)', padding: '2rem', textAlign: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                        <BrainCircuit size={24} />
+                    </div>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, marginBottom: '0.5rem' }}>AI Smart Tips</h3>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                            {data?.insight || 'Sync your financial data to unlock AI-based spending projections and saving tips.'}
+                        </p>
+                    </div>
                 </div>
-                <p style={{ fontSize: '0.875rem', color: '#64748b' }}>{data?.insight || 'Add more data to unlock AI-based spending predictions.'}</p>
             </div>
         );
     }
 
     return (
-        <div className="card" style={{
-            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+        <div className="card hover-lift" style={{
+            background: 'var(--primary-gradient)',
             color: 'white',
             position: 'relative',
             overflow: 'hidden'
         }}>
-            <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.1 }}>
-                <BrainCircuit size={100} />
+            <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', opacity: 0.15 }}>
+                <Sparkles size={120} />
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                <Sparkles size={20} />
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>AI Smart Forecast</h3>
+                <BrainCircuit size={20} color="white" />
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900 }}>AI Smart Tips</h3>
                 <span style={{
                     marginLeft: 'auto',
-                    background: 'rgba(255,255,255,0.2)',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '1rem',
-                    fontSize: '0.7rem'
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    padding: '0.3rem 0.75rem',
+                    borderRadius: '2rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    textTransform: 'uppercase'
                 }}>
-                    Confidence: {data.confidence}
+                    High Confidence
                 </span>
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
-                <p style={{ margin: 0, fontSize: '0.875rem', opacity: 0.8 }}>Predicted Next Month's Expense</p>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                    <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>₹{data.prediction.toLocaleString()}</h2>
-                    <span style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.25rem', color: data.trend === 'up' ? '#fca5a5' : '#86efac' }}>
-                        {data.trend === 'up' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                        {data.trend === 'up' ? 'Trend Up' : 'Trend Down'}
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', fontWeight: 700, textTransform: 'uppercase' }}>Forecasted Spending</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginTop: '0.25rem' }}>
+                    <h2 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 900 }}>₹{(data.prediction || 0).toLocaleString()}</h2>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        {data.trend === 'up' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                        {data.trend === 'up' ? 'UP' : 'DOWN'}
                     </span>
                 </div>
             </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '0.75rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-                <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.5 }}>
-                    <strong>AI Insight:</strong> {data.insight}
+            <div style={{ background: 'rgba(0, 0, 0, 0.15)', padding: '1.25rem', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '0.875rem', alignItems: 'flex-start' }}>
+                <AlertCircle size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5, color: 'white' }}>
+                    {data.insight}
                 </p>
             </div>
         </div>

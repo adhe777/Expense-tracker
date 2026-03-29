@@ -1,104 +1,145 @@
+const asyncHandler = require('express-async-handler');
 const Transaction = require('../models/transactionModel');
+const Budget = require('../models/budgetModel');
 
-const getTransactions = async (req, res) => {
-    try {
-        const transactions = await Transaction.find({ user: req.user.id, isGroupExpense: false }).sort({ date: -1 });
-        res.status(200).json(transactions);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+const getTransactions = asyncHandler(async (req, res) => {
+    const transactions = await Transaction.find({ user: req.user.id, isGroupExpense: false }).sort({ date: -1 });
+    res.status(200).json(transactions);
+});
 
-const addTransaction = async (req, res) => {
+const addTransaction = asyncHandler(async (req, res) => {
     const { title, amount, type, category, date, description, isGroupExpense, groupId } = req.body;
 
     if (!title || !amount || !type || !category) {
-        return res.status(400).json({ message: 'Please add all required fields' });
+        res.status(400);
+        throw new Error('Please add all required fields');
     }
 
-    try {
-        const transaction = await Transaction.create({
-            user: req.user.id,
-            title,
-            amount,
-            type,
-            category,
-            date,
-            description,
-            isGroupExpense: isGroupExpense || false,
-            groupId: isGroupExpense ? groupId : null
-        });
-        res.status(201).json(transaction);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (req.user && req.user.role === 'system_admin') {
+        res.status(403);
+        throw new Error('System admins are restricted from adding personal or group expenses. Please use a regular account for transactions.');
     }
-};
 
-const deleteTransaction = async (req, res) => {
-    try {
-        const transaction = await Transaction.findById(req.params.id);
+    const transaction = await Transaction.create({
+        user: req.user.id,
+        title,
+        amount,
+        type,
+        category,
+        date,
+        description,
+        isGroupExpense: isGroupExpense || false,
+        groupId: isGroupExpense ? groupId : null
+    });
 
-        if (!transaction) {
-            return res.status(404).json({ message: 'Transaction not found' });
-        }
-
-        // Check for user
-        if (transaction.user.toString() !== req.user.id) {
-            return res.status(401).json({ message: 'User not authorized' });
-        }
-
-        await transaction.deleteOne();
-        res.status(200).json({ id: req.params.id });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-const getStats = async (req, res) => {
-    try {
-        const transactions = await Transaction.find({ user: req.user.id, isGroupExpense: false });
+    let warning = null;
+    if (type === 'expense' && !isGroupExpense) {
         const now = new Date();
-        const currentMonth = now.getMonth();
+        const currentMonth = now.getMonth() + 1;
         const currentYear = now.getFullYear();
 
-        let totalIncome = 0;
-        let totalExpense = 0;
-        let monthlyIncome = 0;
-        let monthlyExpense = 0;
+        const budget = await Budget.findOne({
+            user: req.user.id,
+            category,
+            month: currentMonth,
+            year: currentYear
+        });
 
-        transactions.forEach(t => {
-            const tDate = new Date(t.date);
-            if (t.type === 'income') {
-                totalIncome += t.amount;
-                if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
-                    monthlyIncome += t.amount;
+        if (budget) {
+            const results = await Transaction.aggregate([
+                {
+                    $match: {
+                        user: req.user.id,
+                        category,
+                        type: 'expense',
+                        isGroupExpense: false,
+                        date: {
+                            $gte: new Date(currentYear, currentMonth - 1, 1),
+                            $lt: new Date(currentYear, currentMonth, 1)
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: '$amount' }
+                    }
                 }
-            } else {
-                totalExpense += t.amount;
-                if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
-                    monthlyExpense += t.amount;
-                }
+            ]);
+
+            const totalSpent = results.length > 0 ? results[0].total : 0;
+            const limit = budget.amount;
+
+            if (totalSpent > limit) {
+                warning = `You have exceeded your ${category} budget by ₹${totalSpent - limit}.`;
+            } else if (totalSpent >= limit * 0.8) {
+                warning = `You have used ${Math.round((totalSpent / limit) * 100)}% of your ${category} budget.`;
             }
-        });
-
-        const netSavings = totalIncome - totalExpense;
-        const monthlySavings = monthlyIncome - monthlyExpense;
-        const savingsRate = monthlyIncome > 0 ? ((monthlySavings / monthlyIncome) * 100).toFixed(1) : 0;
-
-        res.status(200).json({
-            totalIncome,
-            totalExpense,
-            balance: netSavings,
-            monthlyIncome,
-            monthlyExpense,
-            monthlySavings,
-            savingsRate,
-            transactionCount: transactions.length
-        });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+        }
     }
-}
+
+    res.status(201).json({ ...transaction._doc, warning });
+});
+
+const deleteTransaction = asyncHandler(async (req, res) => {
+    const transaction = await Transaction.findById(req.params.id);
+
+    if (!transaction) {
+        res.status(404);
+        throw new Error('Transaction not found');
+    }
+
+    // Check for user
+    if (transaction.user.toString() !== req.user.id) {
+        res.status(401);
+        throw new Error('User not authorized');
+    }
+
+    await transaction.deleteOne();
+    res.status(200).json({ id: req.params.id });
+});
+
+const getStats = asyncHandler(async (req, res) => {
+    const transactions = await Transaction.find({ user: req.user.id, isGroupExpense: false });
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+    let monthlyIncome = 0;
+    let monthlyExpense = 0;
+
+    transactions.forEach(t => {
+        const tDate = new Date(t.date);
+        if (t.type === 'income') {
+            totalIncome += t.amount;
+            if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
+                monthlyIncome += t.amount;
+            }
+        } else {
+            totalExpense += t.amount;
+            if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
+                monthlyExpense += t.amount;
+            }
+        }
+    });
+
+    const netSavings = totalIncome - totalExpense;
+    const monthlySavings = monthlyIncome - monthlyExpense;
+    const savingsRate = monthlyIncome > 0 ? ((monthlySavings / monthlyIncome) * 100).toFixed(1) : 0;
+
+    res.status(200).json({
+        totalIncome,
+        totalExpense,
+        balance: netSavings,
+        monthlyIncome,
+        monthlyExpense,
+        monthlySavings,
+        savingsRate,
+        transactionCount: transactions.length
+    });
+});
 
 module.exports = {
     getTransactions,
