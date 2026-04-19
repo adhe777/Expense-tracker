@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085/api',
 });
 
 // Request interceptor for adding the JWT token to headers
@@ -49,6 +49,9 @@ export const groupService = {
     acceptInvite: async (id) => (await API.post(`/group/invite/accept/${id}`)).data,
     rejectInvite: async (id) => (await API.post(`/group/invite/reject/${id}`)).data,
     transferAdmin: async (data) => (await API.post('/group/transfer-admin', data)).data,
+    markSplitAsPaid: async (splitId, memberId, groupId) => (await API.patch(`/group/split/${splitId}/pay`, { memberId, groupId })).data,
+    settleAll: async (groupId, targetUserId) => (await API.patch(`/group/settle-all/${groupId}`, { targetUserId })).data,
+    deleteGroup: async (id) => (await API.delete(`/group/${id}`)).data,
 };
 
 // Budget Services
@@ -60,10 +63,11 @@ export const budgetService = {
 
 // Profile Services
 export const profileService = {
-    getProfile: async () => (await API.get('/users/me')).data,
-    updateProfile: async (data) => (await API.put('/users/profile', data)).data,
-    changePassword: async (data) => (await API.put('/users/password', data)).data,
+    getProfile: async () => (await API.get('/profile')).data,
+    updateProfile: async (data) => (await API.put('/profile/update', data)).data,
+    changePassword: async (data) => (await API.put('/profile/change-password', data)).data,
     uploadAvatar: async (data) => (await API.post('/profile/upload-avatar', data)).data,
+    deleteAvatar: async () => (await API.delete('/profile/avatar')).data,
     searchUsers: async (query) => (await API.get(`/users/search?query=${query}`)).data,
 };
 

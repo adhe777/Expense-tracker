@@ -38,6 +38,9 @@ const transactionSchema = mongoose.Schema({
     isGroupExpense: {
         type: Boolean,
         default: false
+    },
+    groupName: {
+        type: String
     }
 }, {
     timestamps: true

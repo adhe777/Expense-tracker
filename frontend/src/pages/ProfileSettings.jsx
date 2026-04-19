@@ -1,10 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { profileService, groupService } from '../services/api';
-import { User, Mail, Lock, Camera, Users, LogOut, ShieldAlert, ArrowLeft, Settings2, Fingerprint, Activity } from 'lucide-react';
+import { 
+    User, 
+    Mail, 
+    Lock, 
+    Camera, 
+    Users, 
+    LogOut, 
+    ShieldAlert, 
+    ArrowLeft, 
+    Settings2, 
+    Fingerprint, 
+    Activity, 
+    Eye, 
+    EyeOff,
+    Trash2
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import ConfirmModal from '../components/ConfirmModal';
+import ThemeToggle from '../components/ThemeToggle';
 
 const ProfileSettings = ({ onBack }) => {
     const { user, login } = useAuth();
@@ -22,6 +38,8 @@ const ProfileSettings = ({ onBack }) => {
     const [email, setEmail] = useState('');
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
 
     const fileInputRef = useRef(null);
 
@@ -46,7 +64,14 @@ const ProfileSettings = ({ onBack }) => {
         e.preventDefault();
         try {
             const updated = await profileService.updateProfile({ name, email });
-            toast.success('Profile updated!');
+            setConfirmModal({
+                isOpen: true,
+                title: 'Profile Updated',
+                message: 'Your personal information has been successfully synchronized with our secure servers.',
+                confirmText: 'EXCELLENT',
+                variant: 'primary',
+                onConfirm: closeConfirmModal
+            });
             // Update auth context too
             const localUser = JSON.parse(sessionStorage.getItem('user'));
             const newLocalUser = { ...localUser, name: updated.name, email: updated.email, avatar: updated.avatar };
@@ -61,7 +86,14 @@ const ProfileSettings = ({ onBack }) => {
         e.preventDefault();
         try {
             await profileService.changePassword({ currentPassword, newPassword });
-            toast.success('Password changed successfully!');
+            setConfirmModal({
+                isOpen: true,
+                title: 'Security Updated',
+                message: 'Your account password has been successfully modified. Please use your new credentials for future authentication cycles.',
+                confirmText: 'GOT IT',
+                variant: 'primary',
+                onConfirm: closeConfirmModal
+            });
             setCurrentPassword('');
             setNewPassword('');
         } catch (error) {
@@ -90,6 +122,31 @@ const ProfileSettings = ({ onBack }) => {
                 toast.error('Uplink error');
             }
         };
+    };
+
+    const handleDeleteAvatar = async () => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete Photo',
+            message: 'Are you sure you want to remove your profile picture? You will revert to a system-generated initial placeholder.',
+            confirmText: 'Remove Photo',
+            variant: 'danger',
+            onConfirm: async () => {
+                closeConfirmModal();
+                try {
+                    await profileService.deleteAvatar();
+                    toast.success('System placeholder restored');
+
+                    const localUser = JSON.parse(sessionStorage.getItem('user'));
+                    const newLocalUser = { ...localUser, avatar: null };
+                    sessionStorage.setItem('user', JSON.stringify(newLocalUser));
+
+                    fetchProfile();
+                } catch (error) {
+                    toast.error('Deletion failed');
+                }
+            }
+        });
     };
 
     const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -124,7 +181,7 @@ const ProfileSettings = ({ onBack }) => {
 
     if (loading || !profile) {
         return (
-            <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)', color: 'var(--text-primary)' }}>
+            <div style={{ height: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)', color: 'var(--text-primary)' }}>
                 <div className="neon-glow" style={{ width: '40px', height: '40px', border: '3px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                 <p style={{ marginTop: '1.5rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Loading Profile...</p>
             </div>
@@ -132,19 +189,8 @@ const ProfileSettings = ({ onBack }) => {
     }
 
     return (
-        <div className="dashboard-container" style={{ padding: '0', background: 'var(--bg-main)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <header className="animate-fade-in" style={{ 
-                padding: '1.5rem 3.5rem', 
-                background: 'var(--bg-sidebar)', 
-                borderBottom: '1px solid var(--border)', 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                position: 'sticky', 
-                top: 0, 
-                zIndex: 9999,
-                boxShadow: 'var(--shadow-premium)'
-            }}>
+        <>
+            <header className="animate-fade-in page-header" style={{ boxShadow: 'var(--shadow-premium)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
                     <button onClick={onBack} className="hover-lift" style={{ 
                         background: 'var(--bg-input)', 
@@ -170,13 +216,16 @@ const ProfileSettings = ({ onBack }) => {
                         </h1>
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem 1.5rem', borderRadius: '1rem', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                    <Activity size={16} color="var(--success)" className="neon-glow" />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--success)', letterSpacing: '0.05em' }}>SECURE SESSION</span>
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                    <ThemeToggle />
+                    <div className="hide-mobile" style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem 1.5rem', borderRadius: '1rem', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                        <Activity size={16} color="var(--success)" className="neon-glow" />
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--success)', letterSpacing: '0.05em' }}>SECURE SESSION</span>
+                    </div>
                 </div>
             </header>
 
-            <main style={{ flex: 1, padding: '3.5rem', overflowY: 'auto' }}>
+            <div className="page-inner">
                 <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '3rem', maxWidth: '1400px', margin: '0 auto' }}>
                     
                     {/* Left: Identity Card */}
@@ -190,13 +239,24 @@ const ProfileSettings = ({ onBack }) => {
                                         {profile.name.charAt(0).toUpperCase()}
                                     </div>
                                 )}
-                                <div
-                                    style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--primary)', color: 'white', padding: '0.75rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', transition: 'all 0.3s' }}
-                                    onClick={() => fileInputRef.current.click()}
-                                    className="hover-opacity"
-                                >
-                                    <Camera size={16} /> Change Photo
-                                </div>
+                                    <div style={{ display: 'flex', position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+                                        <div
+                                            style={{ flex: 1, background: 'var(--primary)', color: 'white', padding: '0.75rem', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.4rem', transition: 'all 0.3s' }}
+                                            onClick={() => fileInputRef.current.click()}
+                                            className="hover-opacity"
+                                        >
+                                            <Camera size={14} /> Upload
+                                        </div>
+                                        {profile.avatar && (
+                                            <div
+                                                style={{ flex: 1, background: 'var(--danger)', color: 'white', padding: '0.75rem', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.4rem', borderLeft: '1px solid rgba(255,255,255,0.2)', transition: 'all 0.3s' }}
+                                                onClick={handleDeleteAvatar}
+                                                className="hover-opacity"
+                                            >
+                                                <Trash2 size={14} /> Remove
+                                            </div>
+                                        )}
+                                    </div>
                                 <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" style={{ display: 'none' }} />
                             </div>
                             <h2 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 0.5rem' }}>{profile.name}</h2>
@@ -298,12 +358,19 @@ const ProfileSettings = ({ onBack }) => {
                                         <div className="icon-input-wrapper">
                                             <Lock className="input-icon" size={18} color="var(--warning)" />
                                             <input
-                                                type="password"
+                                                type={showCurrentPassword ? "text" : "password"}
                                                 value={currentPassword}
                                                 onChange={e => setCurrentPassword(e.target.value)}
                                                 placeholder="••••••••"
                                                 required
                                             />
+                                            <button
+                                                type="button"
+                                                className="password-toggle-btn"
+                                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                            >
+                                                {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="modern-input-group">
@@ -311,22 +378,29 @@ const ProfileSettings = ({ onBack }) => {
                                         <div className="icon-input-wrapper">
                                             <ShieldAlert className="input-icon" size={18} color="var(--warning)" />
                                             <input
-                                                type="password"
+                                                type={showNewPassword ? "text" : "password"}
                                                 value={newPassword}
                                                 onChange={e => setNewPassword(e.target.value)}
                                                 placeholder="••••••••"
                                                 required
                                             />
+                                            <button
+                                                type="button"
+                                                className="password-toggle-btn"
+                                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                            >
+                                                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" className="btn hover-lift neon-glow" style={{ width: 'auto', padding: '0 3rem', height: '3.5rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid var(--warning)', color: 'var(--warning)', fontWeight: 800 }}>UPDATE PASSWORD</button>
+                                <button type="submit" className="btn-modern-submit hover-lift neon-glow" style={{ width: 'auto', padding: '0 3rem', height: '3.5rem' }}>UPDATE PASSWORD</button>
                             </form>
                         </div>
 
                     </div>
                 </div>
-            </main>
+            </div>
 
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
@@ -337,7 +411,7 @@ const ProfileSettings = ({ onBack }) => {
                 onConfirm={confirmModal.onConfirm}
                 onCancel={closeConfirmModal}
             />
-        </div>
+        </>
     );
 };
 

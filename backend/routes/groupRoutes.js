@@ -16,12 +16,13 @@ const {
 } = require('../controllers/groupController');
 const { protect } = require('../middleware/authMiddleware');
 const { groupAdminMiddleware, groupMemberMiddleware } = require('../middleware/adminMiddleware');
-
 const {
     addGroupExpense,
     getSplitSummary,
     getSettlements,
-    settleDebt
+    settleDebt,
+    markSplitAsPaid,
+    settleAllGroupDebts
 } = require('../controllers/groupExpenseController');
 
 // Group Administration Routes
@@ -51,5 +52,7 @@ router.post('/expense', protect, groupMemberMiddleware, addGroupExpense); // Mem
 router.post('/settle', protect, groupMemberMiddleware, settleDebt);      // Members can settle debts
 router.get('/split-summary/:groupId', protect, groupMemberMiddleware, getSplitSummary);
 router.get('/settlement/:groupId', protect, groupMemberMiddleware, getSettlements);
+router.patch('/split/:splitId/pay', protect, groupMemberMiddleware, markSplitAsPaid);
+router.patch('/settle-all/:groupId', protect, groupMemberMiddleware, settleAllGroupDebts);
 
 module.exports = router;

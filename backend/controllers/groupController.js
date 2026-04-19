@@ -47,10 +47,10 @@ const inviteMember = asyncHandler(async (req, res) => {
         throw new Error('Group not found');
     }
 
-    // Only admin (creator) can invite
-    if (group.createdBy.toString() !== req.user.id) {
+    // Only admin (creator) or system admin can invite
+    if (group.createdBy.toString() !== req.user.id && req.user.role !== 'system_admin') {
         res.status(403);
-        throw new Error('Only the group admin can add members');
+        throw new Error('Only the group admin or system admin can add members');
     }
 
     const invitee = await User.findOne({ email });
@@ -85,7 +85,7 @@ const inviteMember = asyncHandler(async (req, res) => {
     // Create a Notification instead of adding them directly
     await Notification.create({
         recipient: invitee._id,
-        sender: req.user.id,
+        sender: req.user.role === 'system_admin' ? group.createdBy : req.user.id, // Emulate group creator if system admin
         type: 'group_invite',
         relatedGroup: group._id
     });
@@ -131,7 +131,7 @@ const removeMember = asyncHandler(async (req, res) => {
 
 // @desc    Delete a group
 // @route   DELETE /api/group/:id
-// @access  Private
+// @access  Private (Group Admin or System Admin)
 const deleteGroup = asyncHandler(async (req, res) => {
     const group = await Group.findById(req.params.id);
 
@@ -140,15 +140,15 @@ const deleteGroup = asyncHandler(async (req, res) => {
         throw new Error('Group not found');
     }
 
-    // Only admin can delete
-    if (group.createdBy.toString() !== req.user.id) {
+    // Only group admin or system admin can delete
+    if (group.createdBy.toString() !== req.user.id && req.user.role !== 'system_admin') {
         res.status(403);
-        throw new Error('Only the group admin can delete the group');
+        throw new Error('Only the group admin or system admin can delete the group');
     }
 
-    // Remove group reference from all members
+    // Remove group reference from ALL members (including the admin/creator)
     await User.updateMany(
-        { _id: { $in: group.members } },
+        { groups: group._id },
         { $pull: { groups: group._id } }
     );
 
@@ -347,7 +347,7 @@ const getGroupMembers = asyncHandler(async (req, res) => {
 // @access  Private/Member
 const getGroupExpenses = asyncHandler(async (req, res) => {
     const expenses = await Transaction.find({ groupId: req.params.groupId, type: 'expense' })
-        .populate('user', 'name')
+        .populate('user', 'name avatar')
         .sort({ date: -1 });
     res.status(200).json(expenses);
 });

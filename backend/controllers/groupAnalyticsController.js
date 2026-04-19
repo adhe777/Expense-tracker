@@ -27,7 +27,7 @@ const getGroupAnalytics = asyncHandler(async (req, res) => {
     // 3. Top Spending Member
     const memberContributions = await Transaction.aggregate([
         { $match: { groupId: groupId, type: 'expense' } },
-        { $group: { _id: '$user', total: { $sum: '$amount' } } },
+        { $group: { _id: '$user', total: { $sum: '$amount' }, count: { $sum: 1 } } },
         { $sort: { total: -1 } }
     ]);
 
@@ -55,11 +55,13 @@ const getGroupAnalytics = asyncHandler(async (req, res) => {
     const averagePerMember = memberCount > 0 ? totalExpense / memberCount : 0;
 
     res.status(200).json({
-        totalExpense,
+        totalSpent: totalExpense,
         categoryTotals,
         memberContributions: memberContributionsWithNames,
+        topSpenders: memberContributionsWithNames.map(m => ({ name: m.name, amount: m.total })),
         monthlyTrend,
         averagePerMember,
+        transactionCount: memberContributions.reduce((sum, m) => sum + (m.count || 0), 0),
         topSpender: memberContributionsWithNames.length > 0 ? memberContributionsWithNames[0].name : 'N/A',
         topCategory: categoryTotals.length > 0 ? categoryTotals[0]._id : 'N/A'
     });
@@ -99,10 +101,10 @@ const getGroupAIInsights = asyncHandler(async (req, res) => {
 
     let promptData = `Group Name: ${group.groupName}\n`;
     promptData += `Total Members: ${group.members.length}\n`;
-    promptData += `Total Shared Group Spending: $${totalSpent}\n\n`;
+    promptData += `Total Shared Group Spending: ₹${totalSpent}\n\n`;
     promptData += `Shared Spending by Category:\n`;
     categoryData.forEach(cat => {
-        promptData += `- ${cat._id}: $${cat.total}\n`;
+        promptData += `- ${cat._id}: ₹${cat.total}\n`;
     });
 
     const prompt = `You are a strict financial advisor analyzing a friend group's shared expenses.
@@ -113,13 +115,22 @@ Please provide 3 dynamic, actionable financial insights for this group in short 
 
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
         
-        const insightsArray = text.split('\n').filter(line => line.trim().length > 0).map(line => line.replace(/^-\s*/, '').trim());
+        // Robust parsing of insights regardless of output format (bullets, numbers, or blocks)
+        const insightsArray = text.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map(line => {
+                // Remove leading [1-9]. or - or * or •
+                return line.replace(/^(\d+\.|-|[*•])\s*/, '').trim();
+            })
+            .filter(line => line.length > 5) // Ignore fragments
+            .slice(0, 3); // Get top 3 as requested
 
         res.status(200).json({ insights: insightsArray });
     } catch (error) {

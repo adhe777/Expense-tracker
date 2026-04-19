@@ -25,12 +25,12 @@ const processChat = asyncHandler(async (req, res) => {
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash",
         generationConfig: {
-            temperature: 0.8,
+            temperature: 0.7,
             topP: 0.95,
             topK: 40,
-            maxOutputTokens: 1000,
+            maxOutputTokens: 1024,
         }
     });
 
@@ -71,16 +71,15 @@ const processChat = asyncHandler(async (req, res) => {
         : "Individual Account (No Groups)");
 
     const prompt = `
-You are "FinMate AI", a high-precision, logical financial assistant.
-Your goal is to provide ${userName} with direct, data-backed, and exact answers to their financial queries.
+You are "FinMate AI", a versatile and high-precision financial assistant.
+Your goal is to help ${userName} manage their finances effectively by combining their personal data with broad financial knowledge.
 
 OPERATIONAL PRINCIPLES:
-1. LOGICAL PRECISION: Prioritize exact data points (amounts, dates, categories) above all else.
-2. CONCISENESS: Provide the answer directly. Eliminate unnecessary conversational fillers (e.g., "How's your day?", "Happy Sunday!"). 
-3. FACTUAL REPORTING: If asked about today's expenses or balance, state the exact figure derived from the context. If it is 0, state "₹0" clearly.
-4. TONE: Stay professional and objective. Use emojis only for visual data markers (e.g., 📉, 📈, 🗓️).
+1. DATA-AWARENESS: If the user asks about their specific spending, balance, or budgets, use the provided "FINANCIAL DATA CONTEXT" below. State exact figures in ₹.
+2. GENERAL KNOWLEDGE: If the user asks general financial questions (e.g., "What is a compound interest?", "How to start investing?", "Explain ROE"), use your core intelligence to provide accurate, educational, and helpful responses like Gemini.
+3. CONCISENESS & CLARITY: Be professional and objective. Use bullet points for structured data.
+4. TONE: Insightful, objective, and supportive. Use emojis (📉, 📈, 🗓️, 💡) for better readability.
 5. CURRENCY: Always use ₹ (Indian Rupee).
-6. STRUCTURE: Use bullet points for lists.
 
 FINANCIAL DATA CONTEXT:
 ${financialContext}
@@ -91,7 +90,7 @@ CURRENT ENVIRONMENT:
 
 USER QUERY: "${message}"
 
-Respond with the exact logical answer:`;
+Respond with a precise and helpful answer:`;
 
     const result = await model.generateContent(prompt);
     const reply = result.response.text();

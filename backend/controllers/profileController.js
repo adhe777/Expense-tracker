@@ -84,9 +84,26 @@ const uploadAvatar = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Remove user avatar
+// @route   DELETE /api/profile/avatar
+// @access  Private
+const removeAvatar = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id);
+
+    if (user) {
+        user.avatar = null;
+        await user.save();
+        res.status(200).json({ message: 'Avatar removed successfully' });
+    } else {
+        res.status(404);
+        throw new Error('User not found');
+    }
+});
+
 module.exports = {
     getProfile,
     updateProfile,
     changePassword,
-    uploadAvatar
+    uploadAvatar,
+    removeAvatar
 };

@@ -6,9 +6,14 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(() => {
-        const storedUser = sessionStorage.getItem('user');
-        if (storedUser) {
-            return JSON.parse(storedUser);
+        try {
+            const storedUser = sessionStorage.getItem('user');
+            if (storedUser && storedUser !== 'undefined') {
+                return JSON.parse(storedUser);
+            }
+        } catch (error) {
+            console.error('Failed to parse user from session:', error);
+            sessionStorage.removeItem('user');
         }
         return null;
     });

@@ -3,7 +3,7 @@ const Transaction = require('../models/transactionModel');
 const Budget = require('../models/budgetModel');
 
 const getTransactions = asyncHandler(async (req, res) => {
-    const transactions = await Transaction.find({ user: req.user.id, isGroupExpense: false }).sort({ date: -1 });
+    const transactions = await Transaction.find({ user: req.user.id }).sort({ date: -1 });
     res.status(200).json(transactions);
 });
 
@@ -52,7 +52,6 @@ const addTransaction = asyncHandler(async (req, res) => {
                         user: req.user.id,
                         category,
                         type: 'expense',
-                        isGroupExpense: false,
                         date: {
                             $gte: new Date(currentYear, currentMonth - 1, 1),
                             $lt: new Date(currentYear, currentMonth, 1)
@@ -100,7 +99,7 @@ const deleteTransaction = asyncHandler(async (req, res) => {
 });
 
 const getStats = asyncHandler(async (req, res) => {
-    const transactions = await Transaction.find({ user: req.user.id, isGroupExpense: false });
+    const transactions = await Transaction.find({ user: req.user.id });
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();

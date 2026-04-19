@@ -30,7 +30,7 @@ async function verifyRestrictions() {
         const johnLogin = await request({
             host, port, path: '/api/users/login', method: 'POST',
             headers: { 'Content-Type': 'application/json' }
-        }, { email: 'john@finmate.com', password: 'password123' });
+        }, { email: 'john@petco.com', password: 'password123' });
 
         let groupId = null;
         if (johnLogin.status === 200) {
@@ -50,7 +50,7 @@ async function verifyRestrictions() {
         const adminLogin = await request({
             host, port, path: '/api/users/login', method: 'POST',
             headers: { 'Content-Type': 'application/json' }
-        }, { email: 'admin@finmate.com', password: 'admin123' });
+        }, { email: 'admin@petco.com', password: 'admin123' });
 
         if (adminLogin.status !== 200) {
             console.error('Admin Login failed:', adminLogin.data);

@@ -107,7 +107,7 @@ const NotificationBell = ({ onUpdateGroups }) => {
                     borderRadius: '1.25rem',
                     boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                     padding: '1.5rem',
-                    zIndex: 1000,
+                    zIndex: 999999,
                     color: 'var(--text-primary)'
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>

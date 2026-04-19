@@ -98,6 +98,27 @@ const addGroupExpense = asyncHandler(async (req, res) => {
         owes
     });
 
+    // 4. Create Personal Transactions for participants (debtors)
+    for (const debt of owes) {
+        await Transaction.create({
+            user: debt.user,
+            groupId,
+            isGroupExpense: true,
+            groupName: group.groupName,
+            title: title, // Mention it's from a group
+            amount: debt.amount,
+            type: 'expense',
+            category: category,
+            description: `Group split from ${req.user.name}`
+        });
+    }
+
+    // 5. Update Payer's transaction to include groupName and potentially adjust
+    transaction.groupName = group.groupName;
+    // Optional: Prefix title or set a description
+    transaction.description = transaction.description || `Group total paid for ${group.groupName}`;
+    await transaction.save();
+
     // Populate split before returning
     const populatedSplit = await Split.findById(split._id)
         .populate('payer', 'name')
@@ -149,6 +170,8 @@ const getSettlements = asyncHandler(async (req, res) => {
         if (!balances[payerId]) balances[payerId] = 0;
 
         split.owes.forEach(debt => {
+            if (debt.status === 'paid') return; // Do not include settled debts in net balance!
+
             const debtorId = debt.user._id.toString();
             names[debtorId] = debt.user.name;
 
@@ -250,9 +273,104 @@ const settleDebt = asyncHandler(async (req, res) => {
     res.status(200).json({ message: 'Debt settled successfully', transaction, split });
 });
 
+// @desc    Mark a specific owe as paid
+// @route   PATCH /api/group/split/:splitId/pay
+// @access  Private
+const markSplitAsPaid = asyncHandler(async (req, res) => {
+    const { splitId } = req.params;
+    const split = await Split.findById(splitId).populate('groupId');
+
+    if (!split) {
+        res.status(404);
+        throw new Error('Split record not found');
+    }
+
+    // Only the payer (the one who received the money) or the admin can mark as paid
+    // Wait, usually the payer marks it as paid when they receive it.
+    if (split.payer.toString() !== req.user.id && req.user.role !== 'system_admin' && split.groupId.createdBy.toString() !== req.user.id) {
+        res.status(403);
+        throw new Error('Only the payer or group admin can confirm payment');
+    }
+
+    // Find the specific owe for the member (if passed in body) or just mark the current user as paid if they are in the split?
+    // Let's assume the payer marks a specific person as paid.
+    const { memberId } = req.body;
+    if (!memberId) {
+        res.status(400);
+        throw new Error('Member ID is required');
+    }
+
+    const owe = split.owes.find(o => o.user.toString() === memberId);
+    if (!owe) {
+        res.status(404);
+        throw new Error('Member not found in this split');
+    }
+
+    owe.status = 'paid';
+    await split.save();
+
+    res.status(200).json({ message: 'Marked as paid', split });
+});
+
+// @desc    Settle all debts between two users in a group
+// @route   PATCH /api/group/settle-all/:groupId
+// @access  Private
+const settleAllGroupDebts = asyncHandler(async (req, res) => {
+    const { groupId } = req.params;
+    const { targetUserId } = req.body;
+
+    if (!targetUserId) {
+        res.status(400);
+        throw new Error('Target user ID is required');
+    }
+
+    // 1. Find all splits in this group where req.user owes targetUser OR targetUser owes req.user
+    // Usually, people settle one-way (I pay you everything I owe).
+    // Let's implement "I pay everything I owe you".
+    const splits = await Split.find({
+        groupId,
+        payer: targetUserId,
+        'owes.user': req.user.id,
+        'owes.status': 'unpaid'
+    });
+
+    if (splits.length === 0) {
+        res.status(200).json({ message: 'No pending debts to settle' });
+        return;
+    }
+
+    let totalSettled = 0;
+    for (const split of splits) {
+        const owe = split.owes.find(o => o.user.toString() === req.user.id);
+        if (owe && owe.status === 'unpaid') {
+            totalSettled += owe.amount;
+            owe.status = 'paid';
+            await split.save();
+        }
+    }
+
+    // Optional: Create a summary transaction for the ledger
+    if (totalSettled > 0) {
+        await Transaction.create({
+            user: req.user.id,
+            groupId,
+            isGroupExpense: true,
+            title: 'Bulk Settlement',
+            amount: Number(totalSettled.toFixed(2)),
+            type: 'expense',
+            category: 'Settlement',
+            description: `Cleared all pending debts with a bulk payment.`
+        });
+    }
+
+    res.status(200).json({ message: `Successfully settled ₹${totalSettled.toFixed(2)}`, totalSettled });
+});
+
 module.exports = {
     addGroupExpense,
     getSplitSummary,
     getSettlements,
-    settleDebt
+    settleDebt,
+    markSplitAsPaid,
+    settleAllGroupDebts
 };

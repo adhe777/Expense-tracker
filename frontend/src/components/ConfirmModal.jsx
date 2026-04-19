@@ -50,7 +50,9 @@ const ConfirmModal = ({ isOpen, title, message, confirmText = 'Confirm', cancelT
             <div
                 className="card"
                 style={{
-                    width: '420px',
+                    width: '360px',
+                    height: 'fit-content',
+                    minHeight: 'auto',
                     padding: '2rem',
                     borderRadius: '1rem',
                     animation: 'slideUp 0.25s ease',

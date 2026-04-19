@@ -24,7 +24,7 @@ const seedDatabase = async () => {
         // 2. Add System Admin
         const systemAdmin = await User.create({
             name: 'System Admin',
-            email: 'admin@finmate.com',
+            email: 'admin@petco.com',
             password: 'admin123',
             role: 'system_admin',
             avatar: 'https://ui-avatars.com/api/?name=System+Admin&background=1890ff&color=fff'
@@ -34,28 +34,28 @@ const seedDatabase = async () => {
         // 3. Add Regular Users
         const john = await User.create({
             name: 'John Doe',
-            email: 'john@finmate.com',
+            email: 'john@petco.com',
             password: 'password123',
             avatar: 'https://ui-avatars.com/api/?name=John+Doe&background=ff4d4f&color=fff'
         });
 
         const jane = await User.create({
             name: 'Jane Smith',
-            email: 'jane@finmate.com',
+            email: 'jane@petco.com',
             password: 'password123',
             avatar: 'https://ui-avatars.com/api/?name=Jane+Smith&background=52c41a&color=fff'
         });
 
         const alice = await User.create({
             name: 'Alice Johnson',
-            email: 'alice@finmate.com',
+            email: 'alice@petco.com',
             password: 'password123',
             avatar: 'https://ui-avatars.com/api/?name=Alice+Johnson&background=722ed1&color=fff'
         });
 
         const bob = await User.create({
             name: 'Bob Brown',
-            email: 'bob@finmate.com',
+            email: 'bob@petco.com',
             password: 'password123',
             avatar: 'https://ui-avatars.com/api/?name=Bob+Brown&background=faad14&color=fff'
         });

@@ -7,7 +7,7 @@ async function verifyRestrictions() {
         // 1. Login as Admin
         console.log('Logging in as Admin...');
         const loginRes = await axios.post(`${baseUrl}/users/login`, {
-            email: 'admin@finmate.com',
+            email: 'admin@petco.com',
             password: 'admin123'
         });
         

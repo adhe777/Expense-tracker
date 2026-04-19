@@ -25,6 +25,11 @@ const splitSchema = new mongoose.Schema({
         amount: {
             type: Number,
             required: true
+        },
+        status: {
+            type: String,
+            enum: ['unpaid', 'paid'],
+            default: 'unpaid'
         }
     }]
 }, { timestamps: true });
