@@ -4,7 +4,7 @@ const { getGroupAnalytics, getGroupAIInsights } = require('../controllers/groupA
 const { protect } = require('../middleware/authMiddleware');
 const { groupMemberMiddleware } = require('../middleware/adminMiddleware');
 
-router.get('/:groupId/analytics', protect, getGroupAnalytics);
-router.get('/:groupId/ai-insights', protect, getGroupAIInsights);
+router.get('/:groupId/analytics', protect, groupMemberMiddleware, getGroupAnalytics);
+router.get('/:groupId/ai-insights', protect, groupMemberMiddleware, getGroupAIInsights);
 
 module.exports = router;

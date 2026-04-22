@@ -228,15 +228,22 @@ const GroupAdminDashboard = ({ groupId, onBack }) => {
                                     </h3>
                                     <div style={{ height: '300px' }}>
                                         {loadingAnalytics ? <Skeleton height="100%" /> : (
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={analytics?.memberContributions || []}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={10} fontWeight={800} stroke="var(--text-muted)" />
-                                                    <YAxis axisLine={false} tickLine={false} fontSize={10} fontWeight={800} stroke="var(--text-muted)" />
-                                                    <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '1rem' }} />
-                                                    <Bar dataKey="total" fill="var(--primary)" radius={[6, 6, 0, 0]} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
+                                            analytics?.memberContributions?.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={analytics?.memberContributions || []}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                                                        <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={10} fontWeight={800} stroke="var(--text-muted)" />
+                                                        <YAxis axisLine={false} tickLine={false} fontSize={10} fontWeight={800} stroke="var(--text-muted)" />
+                                                        <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '1rem' }} />
+                                                        <Bar dataKey="total" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: '1rem' }}>
+                                                    <Users size={32} style={{ opacity: 0.1, marginBottom: '1rem' }} />
+                                                    <p style={{ fontSize: '0.8rem', fontWeight: 700 }}>NO SPENDING DATA</p>
+                                                </div>
+                                            )
                                         )}
                                     </div>
                                 </div>
@@ -247,24 +254,31 @@ const GroupAdminDashboard = ({ groupId, onBack }) => {
                                     </h3>
                                     <div style={{ height: '300px' }}>
                                         {loadingAnalytics ? <Skeleton height="100%" /> : (
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={analytics?.categoryTotals?.map(c => ({ name: c._id, value: c.total })) || []}
-                                                        innerRadius={60}
-                                                        outerRadius={90}
-                                                        paddingAngle={5}
-                                                        dataKey="value"
-                                                        stroke="none"
-                                                    >
-                                                        {(analytics?.categoryTotals || []).map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} cornerRadius={6} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '1rem' }} />
-                                                    <Legend iconType="circle" wrapperStyle={{ fontSize: '0.7rem', fontWeight: 800 }} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
+                                            analytics?.categoryTotals?.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={analytics?.categoryTotals?.map(c => ({ name: c._id, value: c.total })) || []}
+                                                            innerRadius={60}
+                                                            outerRadius={90}
+                                                            paddingAngle={5}
+                                                            dataKey="value"
+                                                            stroke="none"
+                                                        >
+                                                            {(analytics?.categoryTotals || []).map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} cornerRadius={6} />
+                                                            ))}
+                                                        </Pie>
+                                                        <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '1rem' }} />
+                                                        <Legend iconType="circle" wrapperStyle={{ fontSize: '0.7rem', fontWeight: 800 }} />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: '1rem' }}>
+                                                    <Tag size={32} style={{ opacity: 0.1, marginBottom: '1rem' }} />
+                                                    <p style={{ fontSize: '0.8rem', fontWeight: 700 }}>NO CATEGORY DATA</p>
+                                                </div>
+                                            )
                                         )}
                                     </div>
                                 </div>

@@ -9,7 +9,8 @@ import {
     Tag,
     PlusCircle,
     Sun,
-    Moon
+    Moon,
+    Users
 } from 'lucide-react';
 import AIForecast from '../components/AIForecast';
 import { toast } from 'react-hot-toast';
@@ -51,7 +52,8 @@ const Dashboard = () => {
         try {
             const [statsRes, budgetsRes] = await Promise.all([
                 transactionService.getStats(),
-                budgetService.getBudgets()
+                budgetService.getBudgets(),
+                refreshUser()
             ]);
             setStats(statsRes);
             setBudgets(budgetsRes);
@@ -190,7 +192,7 @@ const Dashboard = () => {
                                         />
                                     </div>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                                     <div className="modern-input-group">
                                         <label>Type</label>
                                         <div className="icon-input-wrapper">
@@ -217,6 +219,58 @@ const Dashboard = () => {
                                         </div>
                                     </div>
                                 </div>
+                                
+                                {!isSystemAdmin && authUser?.groups?.length > 0 && (
+                                    <div style={{ padding: '1.25rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '1rem', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: formData.isGroupExpense ? '1rem' : 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <Users size={18} color="var(--primary)" />
+                                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>Is this a Group Expense?</span>
+                                            </div>
+                                            <div 
+                                                onClick={() => setFormData({ ...formData, isGroupExpense: !formData.isGroupExpense })}
+                                                style={{ 
+                                                    width: '44px', 
+                                                    height: '24px', 
+                                                    background: formData.isGroupExpense ? 'var(--primary)' : 'rgba(255,255,255,0.1)', 
+                                                    borderRadius: '12px', 
+                                                    position: 'relative', 
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.3s ease'
+                                                }}
+                                            >
+                                                <div style={{ 
+                                                    width: '18px', 
+                                                    height: '18px', 
+                                                    background: 'white', 
+                                                    borderRadius: '50%', 
+                                                    position: 'absolute', 
+                                                    top: '3px', 
+                                                    left: formData.isGroupExpense ? '23px' : '3px',
+                                                    transition: 'all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+                                                }} />
+                                            </div>
+                                        </div>
+
+                                        {formData.isGroupExpense && (
+                                            <div className="animate-fade-in">
+                                                <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem', display: 'block' }}>Select Target Group</label>
+                                                <select 
+                                                    className="form-input" 
+                                                    value={formData.groupId} 
+                                                    onChange={(e) => setFormData({ ...formData, groupId: e.target.value })}
+                                                    required={formData.isGroupExpense}
+                                                    style={{ width: '100%', height: '3rem', fontSize: '0.85rem' }}
+                                                >
+                                                    <option value="">-- Choose a group --</option>
+                                                    {authUser.groups.map(g => (
+                                                        <option key={g._id} value={g._id}>{g.groupName}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 <button type="submit" className="btn btn-primary" style={{ 
                                     marginTop: '1rem', 
@@ -228,6 +282,66 @@ const Dashboard = () => {
                                     {isSubmitting ? 'Syncing...' : 'Add Transaction'}
                                 </button>
                             </form>
+                        </div>
+                    )}
+
+                    {!isSystemAdmin && (
+                        <div className="card animate-slide-up" style={{ padding: '1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <Users size={20} color="var(--primary)" />
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', margin: 0 }}>Your Groups</h3>
+                                </div>
+                                {authUser?.groups?.length > 0 && (
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', background: 'rgba(99, 102, 241, 0.1)', padding: '0.25rem 0.75rem', borderRadius: '1rem' }}>
+                                        {authUser.groups.length} ACTIVE
+                                    </div>
+                                )}
+                            </div>
+
+                            {authUser?.groups?.length > 0 ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                                    {authUser.groups.map(group => (
+                                        <div key={group._id} className="hover-lift" style={{ 
+                                            padding: '1.5rem', 
+                                            background: 'var(--bg-main)', 
+                                            borderRadius: '1.25rem', 
+                                            border: '1px solid var(--border)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '1rem'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>
+                                                    {group.groupName ? group.groupName.charAt(0).toUpperCase() : 'G'}
+                                                </div>
+                                                <span style={{ fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.groupName || 'Unnamed Group'}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <button 
+                                                    onClick={() => navigate(`/group/${group._id}`)}
+                                                    className="btn" 
+                                                    style={{ flex: 1, height: '2.5rem', fontSize: '0.75rem', fontWeight: 800, background: 'var(--bg-card)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                                                >
+                                                    View
+                                                </button>
+                                                <button 
+                                                    onClick={() => navigate(`/group-admin/${group._id}`)}
+                                                    className="btn" 
+                                                    style={{ flex: 1, height: '2.5rem', fontSize: '0.75rem', fontWeight: 800, background: 'rgba(34, 211, 238, 0.1)', border: '1px solid var(--accent)', color: 'var(--accent)', cursor: 'pointer' }}
+                                                >
+                                                    Stats
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ textAlign: 'center', padding: '2rem', background: 'rgba(255,255,255,0.02)', borderRadius: '1rem', border: '1px dashed var(--border)' }}>
+                                    <Users size={32} style={{ opacity: 0.1, marginBottom: '1rem' }} />
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>No groups found. Create or join one to get started!</p>
+                                </div>
+                            )}
                         </div>
                     )}
                     {isSystemAdmin && (
